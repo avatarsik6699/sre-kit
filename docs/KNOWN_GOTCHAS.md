@@ -39,6 +39,18 @@
 
 - **Prevention**: run Docker with a matching host UID/GID or use named volumes for cache directories that containers own.
 
+### `host-metrics-ssh` skips SSH host key verification (v1)
+
+- **Symptoms**: not a failure today — flagged so it isn't mistaken for an oversight later. The
+  adapter (`adapters/host-metrics-ssh/main.go`) dials with `ssh.InsecureIgnoreHostKey()`, so it
+  will happily connect to a spoofed host (MITM) with no warning.
+- **Root cause**: v1 has no `known_hosts` store or first-connection TOFU (trust-on-first-use)
+  pinning mechanism; building one was out of scope for `M2` (docs/changes/02-host-metrics-ssh-adapter.md).
+- **Fix**: none yet — acceptable for a solo-developer/small-team SSH-to-own-VPS use case in v1,
+  but revisit before `M6` dogfooding widens exposure (e.g. persist the host key fingerprint on
+  first successful connect, alongside the source's config, and fail loudly on mismatch after).
+- **Prevention**: n/a until a TOFU/pinning implementation exists.
+
 <!--
 ### [Title — short, punchy, searchable]
 

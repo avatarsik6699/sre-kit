@@ -119,10 +119,18 @@ func main() {
 			// Convention (matches Dockerfile): an adapter's executable is named after its
 			// directory, e.g. adapters/stub/stub.
 			command := filepath.Join(adapter.Dir, filepath.Base(adapter.Dir))
+			// sources.config_json only ever stores a secret_ref (docs/SPEC.md §3) — resolve it to
+			// the real plaintext (SSH password/key, etc.) here, at spawn time, so the subprocess's
+			// stdin carries a usable credential. The ref never leaves this process otherwise.
+			resolvedConfig, err := secrets.ResolveConfig(secretsStore, adapter.Manifest.ConfigSchema, source.ConfigJSON)
+			if err != nil {
+				log.Printf("adapterengine: source %s: resolve config secrets: %v", source.ID, err)
+				return
+			}
 			scheduler.Schedule(schedulerCtx, adapterengineapp.PullJob{
 				SourceID: source.ID,
 				Command:  command,
-				Config:   []byte(source.ConfigJSON),
+				Config:   resolvedConfig,
 			})
 			return
 		}

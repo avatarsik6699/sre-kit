@@ -14,6 +14,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o /out/server ./cmd/server
 RUN CGO_ENABLED=0 go build -o /out/adapters/stub/stub ./adapters/stub
+RUN CGO_ENABLED=0 go build -o /out/adapters/host-metrics-ssh/host-metrics-ssh ./adapters/host-metrics-ssh
 
 FROM alpine:3.20
 RUN addgroup -S sre-kit && adduser -S -G sre-kit sre-kit
@@ -22,6 +23,8 @@ WORKDIR /app
 COPY --from=build /out/server ./server
 COPY --from=build /out/adapters/stub/stub ./adapters/stub/stub
 COPY adapters/stub/manifest.json ./adapters/stub/manifest.json
+COPY --from=build /out/adapters/host-metrics-ssh/host-metrics-ssh ./adapters/host-metrics-ssh/host-metrics-ssh
+COPY adapters/host-metrics-ssh/manifest.json ./adapters/host-metrics-ssh/manifest.json
 
 RUN mkdir -p /app/data && chown -R sre-kit:sre-kit /app
 USER sre-kit
