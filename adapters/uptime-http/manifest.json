@@ -1,0 +1,32 @@
+{
+  "name": "uptime-http",
+  "version": "0.1.0",
+  "mode": "pull",
+  "emits": ["check"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Target to probe: http://, https://, or tcp://host:port for a plain TCP dial check."
+      },
+      "method": { "type": "string", "default": "GET" },
+      "timeout_seconds": { "type": "integer", "default": 10, "minimum": 1 },
+      "expect_status": { "type": "integer", "default": 200 },
+      "basic_auth_secret": {
+        "type": "string",
+        "format": "secret",
+        "description": "secret_ref to a \"username:password\" pair, resolved by the core before the adapter is spawned. Optional — omit for unauthenticated targets."
+      },
+      "tls_expiry_warn_days": {
+        "type": "integer",
+        "default": 14,
+        "minimum": 1,
+        "description": "Only meaningful for https:// targets — days-remaining threshold below which the tls.cert_expiry check reports warn instead of ok."
+      }
+    },
+    "required": ["url"],
+    "additionalProperties": false
+  }
+}
