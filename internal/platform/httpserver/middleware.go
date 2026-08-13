@@ -1,10 +1,13 @@
 package httpserver
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"time"
 )
@@ -64,6 +67,17 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
+}
+
+// Hijack forwards to the wrapped ResponseWriter's http.Hijacker so withLogging doesn't break
+// WebSocket upgrades (GET /api/stream) — without this, wrapping loses the Hijacker interface and
+// coder/websocket's Accept fails every upgrade with 501 Not Implemented.
+func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("httpserver: underlying ResponseWriter does not support Hijack")
+	}
+	return hijacker.Hijack()
 }
 
 func newRequestID() string {

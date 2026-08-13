@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"sre-kit/internal/platform/wshub"
 	"sre-kit/internal/telemetry/application"
 	"sre-kit/internal/telemetry/domain"
 	telemetryhttp "sre-kit/internal/telemetry/interfaces/http"
@@ -65,7 +66,7 @@ func TestListMetrics_FiltersBySource(t *testing.T) {
 	}
 
 	mux := http.NewServeMux()
-	telemetryhttp.NewHandlers(svc).Register(mux)
+	telemetryhttp.NewHandlers(svc, wshub.New()).Register(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/metrics?source=src-1", nil)
 	rec := httptest.NewRecorder()
@@ -86,7 +87,7 @@ func TestListMetrics_FiltersBySource(t *testing.T) {
 func TestListMetrics_RejectsMalformedFrom(t *testing.T) {
 	svc := application.NewService(&fakeMetricRepo{}, &fakeCheckRepo{}, &fakeEventRepo{})
 	mux := http.NewServeMux()
-	telemetryhttp.NewHandlers(svc).Register(mux)
+	telemetryhttp.NewHandlers(svc, wshub.New()).Register(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/metrics?from=not-a-time", nil)
 	rec := httptest.NewRecorder()
@@ -107,7 +108,7 @@ func TestListEvents_RespectsLimit(t *testing.T) {
 	}
 
 	mux := http.NewServeMux()
-	telemetryhttp.NewHandlers(svc).Register(mux)
+	telemetryhttp.NewHandlers(svc, wshub.New()).Register(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/events?limit=2", nil)
 	rec := httptest.NewRecorder()
@@ -130,7 +131,7 @@ func TestListChecks_ReturnsStatus(t *testing.T) {
 	}
 
 	mux := http.NewServeMux()
-	telemetryhttp.NewHandlers(svc).Register(mux)
+	telemetryhttp.NewHandlers(svc, wshub.New()).Register(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/checks", nil)
 	rec := httptest.NewRecorder()

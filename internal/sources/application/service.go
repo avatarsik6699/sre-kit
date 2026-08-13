@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -22,11 +23,12 @@ type ChangeHook func(ctx context.Context, source domain.Source, deleted bool)
 type Service struct {
 	repo     domain.Repository
 	onChange ChangeHook
+	now      func() time.Time // overridable in tests
 }
 
 // NewService wires a Service to its repository port.
 func NewService(repo domain.Repository) *Service {
-	return &Service{repo: repo}
+	return &Service{repo: repo, now: time.Now}
 }
 
 // OnChange registers hook to run after every successful Create/Update/Delete. Returns Service for
@@ -114,6 +116,28 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("sources: delete: %w", err)
 	}
 	s.notifyChange(ctx, source, true)
+	return nil
+}
+
+// MarkSeen updates id's last_seen_at to now and, when status is non-empty, its last_status.
+// Deliberately bypasses OnChange — called on every telemetry ingest (internal/telemetry/
+// application.Service), so re-triggering the adapter engine's schedule-reconcile hook on every
+// check/metric/event would be wasteful and pointless (config/enabled state hasn't changed).
+// Signature intentionally uses only stdlib types so it structurally satisfies
+// telemetry/application.SourceStatusUpdater without either package importing the other.
+func (s *Service) MarkSeen(ctx context.Context, id string, status string) error {
+	source, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	seenAt := s.now()
+	source.LastSeenAt = &seenAt
+	if status != "" {
+		source.LastStatus = status
+	}
+	if err := s.repo.Update(ctx, source); err != nil {
+		return fmt.Errorf("sources: mark seen: %w", err)
+	}
 	return nil
 }
 

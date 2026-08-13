@@ -570,6 +570,21 @@
           }
         }
       }
+    },
+    "/api/stream": {
+      "get": {
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "description": "WebSocket: subscribe/unsubscribe by source_id, receive live Metric/Check/Event frames",
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Live stream",
+        "responses": {}
+      }
     }
   },
   "servers": [

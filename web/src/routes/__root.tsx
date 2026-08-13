@@ -12,14 +12,21 @@ import {
   HeadContent,
   Outlet,
   Scripts,
-  createRootRoute,
+  createRootRouteWithContext,
 } from "@tanstack/react-router";
+import type { QueryClient } from "@tanstack/react-query";
 import type React from "react";
 import { ClientErrorMonitor } from "~/shared/components/client-error-monitor";
 import { NavigationProgress } from "~/shared/components/navigation-progress";
 import { mantineTheme } from "~/shared/config/mantine-theme";
 
-export const Route = createRootRoute({
+// Typed router context (queryClient, wired in router.tsx) — routes/_authenticated.tsx's
+// beforeLoad reads context.queryClient to warm/guard the sources query before rendering.
+export type RouterContext = {
+  queryClient: QueryClient;
+};
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },

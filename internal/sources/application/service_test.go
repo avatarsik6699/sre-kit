@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"sre-kit/internal/sources/application"
 	"sre-kit/internal/sources/domain"
@@ -162,5 +163,87 @@ func TestOnChange_NotCalledWhenMutationFails(t *testing.T) {
 	}
 	if called {
 		t.Fatal("OnChange fired despite Create failing validation")
+	}
+}
+
+func TestMarkSeen_UpdatesStatusAndSeenAt(t *testing.T) {
+	svc := application.NewService(newFakeRepo())
+	fixedNow := time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC)
+	application.SetClockForTest(svc, func() time.Time { return fixedNow })
+
+	source, err := svc.Create(context.Background(), "uptime-http", "{}")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if source.LastStatus != domain.StatusUnreachable || source.LastSeenAt != nil {
+		t.Fatalf("Create: want default unreachable/nil, got status=%q seenAt=%v", source.LastStatus, source.LastSeenAt)
+	}
+
+	if err := svc.MarkSeen(context.Background(), source.ID, domain.StatusOK); err != nil {
+		t.Fatalf("MarkSeen: %v", err)
+	}
+
+	sources, err := svc.List(context.Background())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("List: got %d sources, want 1", len(sources))
+	}
+	got := sources[0]
+	if got.LastStatus != domain.StatusOK {
+		t.Fatalf("LastStatus = %q, want %q", got.LastStatus, domain.StatusOK)
+	}
+	if got.LastSeenAt == nil || !got.LastSeenAt.Equal(fixedNow) {
+		t.Fatalf("LastSeenAt = %v, want %v", got.LastSeenAt, fixedNow)
+	}
+}
+
+func TestMarkSeen_EmptyStatusOnlyTouchesSeenAt(t *testing.T) {
+	svc := application.NewService(newFakeRepo())
+	source, err := svc.Create(context.Background(), "uptime-http", "{}")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if err := svc.MarkSeen(context.Background(), source.ID, ""); err != nil {
+		t.Fatalf("MarkSeen: %v", err)
+	}
+
+	sources, err := svc.List(context.Background())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	got := sources[0]
+	if got.LastStatus != domain.StatusUnreachable {
+		t.Fatalf("LastStatus = %q, want unchanged %q", got.LastStatus, domain.StatusUnreachable)
+	}
+	if got.LastSeenAt == nil {
+		t.Fatal("LastSeenAt: want non-nil after MarkSeen")
+	}
+}
+
+func TestMarkSeen_DoesNotFireOnChange(t *testing.T) {
+	svc := application.NewService(newFakeRepo())
+	source, err := svc.Create(context.Background(), "uptime-http", "{}")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	called := false
+	svc.OnChange(func(context.Context, domain.Source, bool) { called = true })
+
+	if err := svc.MarkSeen(context.Background(), source.ID, domain.StatusOK); err != nil {
+		t.Fatalf("MarkSeen: %v", err)
+	}
+	if called {
+		t.Fatal("OnChange fired on MarkSeen — would needlessly re-trigger scheduler reconciliation on every telemetry ingest")
+	}
+}
+
+func TestMarkSeen_UnknownIDReturnsErrNotFound(t *testing.T) {
+	svc := application.NewService(newFakeRepo())
+	if err := svc.MarkSeen(context.Background(), "does-not-exist", domain.StatusOK); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("MarkSeen unknown id: got %v, want ErrNotFound", err)
 	}
 }

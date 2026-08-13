@@ -86,6 +86,73 @@ func TestIngestEvent_PersistsFields(t *testing.T) {
 	}
 }
 
+type statusUpdateCall struct {
+	sourceID string
+	status   string
+}
+
+type fakeStatusUpdater struct{ calls []statusUpdateCall }
+
+func (f *fakeStatusUpdater) MarkSeen(_ context.Context, sourceID, status string) error {
+	f.calls = append(f.calls, statusUpdateCall{sourceID: sourceID, status: status})
+	return nil
+}
+
+func TestIngestMetric_MarksSeenWithNoStatus(t *testing.T) {
+	updater := &fakeStatusUpdater{}
+	svc := application.NewService(&fakeMetricRepo{}, &fakeCheckRepo{}, &fakeEventRepo{}, application.WithSourceStatusUpdater(updater))
+
+	if err := svc.IngestMetric(context.Background(), "src-1", "cpu.usage_percent", time.Now(), 1, nil); err != nil {
+		t.Fatalf("IngestMetric: %v", err)
+	}
+	if len(updater.calls) != 1 || updater.calls[0] != (statusUpdateCall{sourceID: "src-1", status: ""}) {
+		t.Fatalf("MarkSeen calls = %+v, want one call with empty status", updater.calls)
+	}
+}
+
+func TestIngestEvent_MarksSeenWithNoStatus(t *testing.T) {
+	updater := &fakeStatusUpdater{}
+	svc := application.NewService(&fakeMetricRepo{}, &fakeCheckRepo{}, &fakeEventRepo{}, application.WithSourceStatusUpdater(updater))
+
+	if err := svc.IngestEvent(context.Background(), "src-1", time.Now(), "warn", "msg", nil); err != nil {
+		t.Fatalf("IngestEvent: %v", err)
+	}
+	if len(updater.calls) != 1 || updater.calls[0] != (statusUpdateCall{sourceID: "src-1", status: ""}) {
+		t.Fatalf("MarkSeen calls = %+v, want one call with empty status", updater.calls)
+	}
+}
+
+func TestIngestCheck_MarksSeenWithMappedStatus(t *testing.T) {
+	tests := []struct {
+		checkStatus string
+		wantStatus  string
+	}{
+		{"ok", "ok"},
+		{"warn", "ok"},
+		{"critical", "error"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.checkStatus, func(t *testing.T) {
+			updater := &fakeStatusUpdater{}
+			svc := application.NewService(&fakeMetricRepo{}, &fakeCheckRepo{}, &fakeEventRepo{}, application.WithSourceStatusUpdater(updater))
+
+			if err := svc.IngestCheck(context.Background(), "src-1", "http.reachable", time.Now(), tt.checkStatus, nil); err != nil {
+				t.Fatalf("IngestCheck: %v", err)
+			}
+			if len(updater.calls) != 1 || updater.calls[0] != (statusUpdateCall{sourceID: "src-1", status: tt.wantStatus}) {
+				t.Fatalf("MarkSeen calls = %+v, want one call with status %q", updater.calls, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestIngest_NilStatusUpdaterIsSafe(t *testing.T) {
+	svc := application.NewService(&fakeMetricRepo{}, &fakeCheckRepo{}, &fakeEventRepo{})
+	if err := svc.IngestCheck(context.Background(), "src-1", "http.reachable", time.Now(), "ok", nil); err != nil {
+		t.Fatalf("IngestCheck without a status updater configured: %v", err)
+	}
+}
+
 func TestQueryMetrics_ReturnsRepoResults(t *testing.T) {
 	metrics := &fakeMetricRepo{}
 	svc := application.NewService(metrics, &fakeCheckRepo{}, &fakeEventRepo{})

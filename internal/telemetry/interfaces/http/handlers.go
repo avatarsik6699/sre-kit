@@ -11,25 +11,29 @@ import (
 	"time"
 
 	"sre-kit/internal/platform/apierror"
+	"sre-kit/internal/platform/wshub"
 	"sre-kit/internal/telemetry/application"
 	"sre-kit/internal/telemetry/domain"
 )
 
-// Handlers exposes the telemetry query HTTP surface bound to a *application.Service.
+// Handlers exposes the telemetry query HTTP surface bound to a *application.Service, plus the
+// live GET /api/stream WS endpoint bound to a *wshub.Hub.
 type Handlers struct {
 	service *application.Service
+	hub     *wshub.Hub
 }
 
-// NewHandlers wires Handlers to svc.
-func NewHandlers(svc *application.Service) *Handlers {
-	return &Handlers{service: svc}
+// NewHandlers wires Handlers to svc and hub.
+func NewHandlers(svc *application.Service, hub *wshub.Hub) *Handlers {
+	return &Handlers{service: svc, hub: hub}
 }
 
-// Register mounts /api/metrics, /api/checks, /api/events on mux.
+// Register mounts /api/metrics, /api/checks, /api/events, /api/stream on mux.
 func (h *Handlers) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/metrics", h.listMetrics)
 	mux.HandleFunc("GET /api/checks", h.listChecks)
 	mux.HandleFunc("GET /api/events", h.listEvents)
+	mux.HandleFunc("GET /api/stream", h.stream)
 }
 
 type metricResponse struct {

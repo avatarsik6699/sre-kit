@@ -29,6 +29,7 @@ import (
 	"sre-kit/internal/platform/db"
 	"sre-kit/internal/platform/httpserver"
 	"sre-kit/internal/platform/secrets"
+	"sre-kit/internal/platform/wshub"
 	sourcesapp "sre-kit/internal/sources/application"
 	sourcesdomain "sre-kit/internal/sources/domain"
 	sourcesinfra "sre-kit/internal/sources/infrastructure"
@@ -37,6 +38,17 @@ import (
 	telemetryinfra "sre-kit/internal/telemetry/infrastructure"
 	telemetryhttp "sre-kit/internal/telemetry/interfaces/http"
 )
+
+// hubPublisher adapts telemetryapp.Publisher onto wshub.Hub — the composition-root translation
+// between telemetry/application's dependency-free Frame and wshub's concrete Frame, per
+// docs/STACK.md's ports-over-direct-imports rule.
+type hubPublisher struct {
+	hub *wshub.Hub
+}
+
+func (p hubPublisher) Publish(frame telemetryapp.Frame) {
+	p.hub.Publish(wshub.Frame{Type: frame.Type, SourceID: frame.SourceID, Payload: frame.Payload})
+}
 
 func main() {
 	cfg, err := config.Load()
@@ -73,12 +85,17 @@ func main() {
 	authhttp.NewHandlers(authService).Register(srv.Mux)
 	srv.Use(authhttp.RequireSession(authService))
 
-	telemetryRepos := telemetryinfra.NewSQLiteRepository(sqlDB)
-	telemetryService := telemetryapp.NewService(telemetryRepos.Metrics, telemetryRepos.Checks, telemetryRepos.Events)
-	telemetryhttp.NewHandlers(telemetryService).Register(srv.Mux)
-
 	sourcesRepo := sourcesinfra.NewSQLiteRepository(sqlDB)
 	sourcesService := sourcesapp.NewService(sourcesRepo)
+
+	hub := wshub.New()
+	telemetryRepos := telemetryinfra.NewSQLiteRepository(sqlDB)
+	telemetryService := telemetryapp.NewService(
+		telemetryRepos.Metrics, telemetryRepos.Checks, telemetryRepos.Events,
+		telemetryapp.WithPublisher(hubPublisher{hub: hub}),
+		telemetryapp.WithSourceStatusUpdater(sourcesService),
+	)
+	telemetryhttp.NewHandlers(telemetryService, hub).Register(srv.Mux)
 
 	// Adapter engine: pull-mode sources are kept scheduled in sync with source state via
 	// sourcesService.OnChange below (see docs/changes/01-core-skeleton.md Architect Review Notes

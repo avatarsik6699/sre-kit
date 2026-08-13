@@ -14,16 +14,79 @@ import (
 
 const schemaVersion = "1.0"
 
-// Service implements telemetry ingest and query against the three domain repository ports.
-type Service struct {
-	metrics domain.MetricRepository
-	checks  domain.CheckRepository
-	events  domain.EventRepository
+// Frame is one record pushed to Publisher after a successful ingest — deliberately a plain struct
+// (not internal/platform/wshub.Frame) so this package doesn't import a websocket/hub dependency;
+// cmd/server/main.go wires an adapter that translates Frame into wshub.Frame.
+type Frame struct {
+	Type     string // "metric" | "check" | "event", per docs/SPEC.md §4
+	SourceID string
+	Payload  any
 }
 
-// NewService wires a Service to its three repositories.
-func NewService(metrics domain.MetricRepository, checks domain.CheckRepository, events domain.EventRepository) *Service {
-	return &Service{metrics: metrics, checks: checks, events: events}
+// Publisher is the port telemetry/application uses to fan newly-ingested records out to live
+// WebSocket subscribers (GET /api/stream, internal/platform/wshub). Optional — a Service with no
+// Publisher configured simply doesn't push live updates.
+type Publisher interface {
+	Publish(frame Frame)
+}
+
+// SourceStatusUpdater is the port telemetry/application uses to keep a Source's rollup fields
+// (sources.last_status/last_seen_at, docs/SPEC.md §3) current as telemetry arrives — kept as a
+// narrow port, not a direct import of internal/sources, per docs/STACK.md's ports-over-direct-
+// imports rule (mirrors adapterengine's own SourceDisabler). Optional — a Service with no
+// SourceStatusUpdater configured simply doesn't touch source rollup state.
+type SourceStatusUpdater interface {
+	// MarkSeen updates sourceID's last_seen_at to now and, when status is non-empty, its
+	// last_status. status is "" for metric/event ingestion (only checks carry a status).
+	MarkSeen(ctx context.Context, sourceID, status string) error
+}
+
+// Service implements telemetry ingest and query against the three domain repository ports.
+type Service struct {
+	metrics       domain.MetricRepository
+	checks        domain.CheckRepository
+	events        domain.EventRepository
+	publisher     Publisher
+	statusUpdater SourceStatusUpdater
+}
+
+// Option configures optional Service dependencies.
+type Option func(*Service)
+
+// WithPublisher wires pub as the Service's live-stream fan-out target.
+func WithPublisher(pub Publisher) Option {
+	return func(s *Service) { s.publisher = pub }
+}
+
+// WithSourceStatusUpdater wires updater to keep sources.last_status/last_seen_at current as
+// telemetry is ingested.
+func WithSourceStatusUpdater(updater SourceStatusUpdater) Option {
+	return func(s *Service) { s.statusUpdater = updater }
+}
+
+// NewService wires a Service to its three repositories, plus any Options (e.g. WithPublisher).
+func NewService(metrics domain.MetricRepository, checks domain.CheckRepository, events domain.EventRepository, opts ...Option) *Service {
+	s := &Service{metrics: metrics, checks: checks, events: events}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+func (s *Service) publish(frame Frame) {
+	if s.publisher != nil {
+		s.publisher.Publish(frame)
+	}
+}
+
+// markSeen best-effort updates the source's rollup fields — a failure here (e.g. the source was
+// deleted between the adapter spawning and this line landing) must never fail an already-persisted
+// ingest, so the error is deliberately dropped (mirrors adapterengine/application.Runner's
+// same-shaped auto-disable call).
+func (s *Service) markSeen(ctx context.Context, sourceID, status string) {
+	if s.statusUpdater != nil {
+		_ = s.statusUpdater.MarkSeen(ctx, sourceID, status)
+	}
 }
 
 // IngestMetric persists one metric point. ts is always stamped by the adapter runner
@@ -46,6 +109,10 @@ func (s *Service) IngestMetric(ctx context.Context, sourceID, name string, ts ti
 	if err := s.metrics.Insert(ctx, metric); err != nil {
 		return fmt.Errorf("telemetry: ingest metric: %w", err)
 	}
+	s.markSeen(ctx, sourceID, "")
+	s.publish(Frame{Type: "metric", SourceID: sourceID, Payload: map[string]any{
+		"source_id": sourceID, "name": name, "ts": ts.Format(time.RFC3339), "value": value, "labels": labelsJSON,
+	}})
 	return nil
 }
 
@@ -66,7 +133,24 @@ func (s *Service) IngestCheck(ctx context.Context, sourceID, name string, ts tim
 	if err := s.checks.Insert(ctx, check); err != nil {
 		return fmt.Errorf("telemetry: ingest check: %w", err)
 	}
+	s.markSeen(ctx, sourceID, sourceStatusForCheck(status))
+	s.publish(Frame{Type: "check", SourceID: sourceID, Payload: map[string]any{
+		"source_id": sourceID, "name": name, "ts": ts.Format(time.RFC3339), "status": status, "meta": metaJSON,
+	}})
 	return nil
+}
+
+// sourceStatusForCheck maps a check's status (contract.schema.json's "ok"/"warn"/"critical") down
+// to sources.last_status's coarser enum (docs/SPEC.md §3: "ok"/"unreachable"/"error") — last_status
+// tracks whether the source is reachable/reporting at all, not the fine-grained per-check verdict
+// (that detail is already visible per-check via GET /api/checks). "warn" maps to "ok" since the
+// source itself is still reporting fine; "unreachable" is reserved for sources that have never
+// reported and is never re-derived here.
+func sourceStatusForCheck(status string) string {
+	if status == "critical" {
+		return "error"
+	}
+	return "ok"
 }
 
 // IngestEvent persists one event.
@@ -86,6 +170,10 @@ func (s *Service) IngestEvent(ctx context.Context, sourceID string, ts time.Time
 	if err := s.events.Insert(ctx, event); err != nil {
 		return fmt.Errorf("telemetry: ingest event: %w", err)
 	}
+	s.markSeen(ctx, sourceID, "")
+	s.publish(Frame{Type: "event", SourceID: sourceID, Payload: map[string]any{
+		"source_id": sourceID, "ts": ts.Format(time.RFC3339), "level": level, "message": message, "labels": labelsJSON,
+	}})
 	return nil
 }
 
