@@ -1,0 +1,7 @@
+.git
+web/
+docs/
+.claude/
+.agents/
+plugins/
+*.md

@@ -1,0 +1,19 @@
+# Go
+/data/
+*.db
+*.db-wal
+*.db-shm
+/.swagger-gen/
+
+# Secrets — never commit
+.env
+secrets.enc.json
+
+# Frontend
+web/node_modules/
+web/dist/
+web/.output/
+web/.vinxi/
+web/src/routeTree.gen.ts
+web/test-results/
+web/playwright-report/

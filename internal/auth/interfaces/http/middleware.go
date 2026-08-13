@@ -1,0 +1,41 @@
+package http
+
+import (
+	"net/http"
+
+	"sre-kit/internal/auth/application"
+	"sre-kit/internal/auth/domain"
+	"sre-kit/internal/platform/apierror"
+)
+
+// publicPaths lists the only two routes SPEC §6 exempts from session-gating: login itself (it *is*
+// the login) and a health check.
+var publicPaths = map[string]bool{
+	"/api/auth/login": true,
+	"/healthz":        true,
+}
+
+// RequireSession returns middleware that rejects any request outside publicPaths unless it carries
+// a valid, unexpired session cookie. Mounted around the whole mux in cmd/server/main.go via
+// httpserver.Server.Use, per docs/STACK.md's internal/auth tree note ("session-required middleware
+// mounted in platform/httpserver").
+func RequireSession(svc *application.Service) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if publicPaths[r.URL.Path] {
+				next.ServeHTTP(w, r)
+				return
+			}
+			cookie, err := r.Cookie(sessionCookieName)
+			if err != nil {
+				apierror.Write(w, domain.ErrSessionInvalid)
+				return
+			}
+			if err := svc.ValidateSession(r.Context(), cookie.Value); err != nil {
+				apierror.Write(w, err)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}

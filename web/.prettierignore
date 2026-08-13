@@ -1,0 +1,9 @@
+node_modules
+pnpm-lock.yaml
+dist
+.output
+.vinxi
+src/routeTree.gen.ts
+src/shared/api/schema.ts
+contracts/openapi.json
+*.md

@@ -1,0 +1,11 @@
+{
+  "name": "stub",
+  "version": "0.1.0",
+  "mode": "pull",
+  "emits": ["metric"],
+  "config_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  }
+}
