@@ -6,6 +6,7 @@ import { mantineThemeConstants } from "~/shared/config/mantine-theme";
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: "◧" },
   { to: "/sources", label: "Sources", icon: "▤" },
+  { to: "/notifications", label: "Notifications", icon: "◔" },
 ] as const;
 
 /** Left icon+label collapsible rail nav (docs/SPEC.md §5.3) — persistent side nav for a tool used

@@ -12,6 +12,7 @@ import {
   useMetricsQuery,
 } from "~/entities/telemetry";
 import type { MetricPoint } from "~/entities/telemetry";
+import { useAlertsQuery, useLiveAlerts } from "~/entities/alert";
 import type { StatusTileTypes } from "./status-tile.types";
 
 export const statusTileUtils = {
@@ -47,6 +48,22 @@ export const statusTileUtils = {
     return lastStatus === "error" ? "critical" : "unreachable";
   },
 
+  /** An active alert on this source overrides the connectivity-derived pulse — the alert's own
+   * severity is the more specific, more urgent signal (docs/SPEC.md §5.3's pulse motif reused for
+   * alert severity). */
+  toPulseStatusWithAlert(
+    lastStatus: string,
+    activeSeverities: string[],
+  ): StatusPulseStatus {
+    if (activeSeverities.includes("critical")) {
+      return "critical";
+    }
+    if (activeSeverities.includes("warning")) {
+      return "warn";
+    }
+    return this.toPulseStatus(lastStatus);
+  },
+
   summarizeChecks(statuses: string[] | undefined): string {
     if (!statuses || statuses.length === 0) {
       return "no checks";
@@ -64,13 +81,18 @@ export const statusTileUtils = {
 /** Renders one source's live status — reused on Dashboard and Sources (docs/SPEC.md §5.2). */
 export const StatusTile: React.FC<StatusTileTypes.Props> = (props) => {
   useLiveTelemetry(props.source.id);
+  useLiveAlerts(props.source.id);
   const metricsQuery = useMetricsQuery(props.source.id);
   const checksQuery = useChecksQuery(props.source.id);
+  const alertsQuery = useAlertsQuery("active");
 
   const sparklineData = statusTileUtils.pickSparklineSeries(metricsQuery.data);
   const checkSummary = statusTileUtils.summarizeChecks(
     checksQuery.data?.map((check) => check.status),
   );
+  const activeSeverities = (alertsQuery.data ?? [])
+    .filter((alert) => alert.sourceId === props.source.id)
+    .map((alert) => alert.severity);
 
   return (
     <Link
@@ -82,7 +104,10 @@ export const StatusTile: React.FC<StatusTileTypes.Props> = (props) => {
         <Stack gap="xs">
           <Group justify="space-between" wrap="nowrap">
             <StatusPulse
-              status={statusTileUtils.toPulseStatus(props.source.lastStatus)}
+              status={statusTileUtils.toPulseStatusWithAlert(
+                props.source.lastStatus,
+                activeSeverities,
+              )}
               label={props.source.adapterId}
             />
             {!props.source.enabled ? (

@@ -149,7 +149,15 @@ CREATE TABLE alert_rules (
   condition TEXT,                -- '>' | '<' | '=' | 'status_is'
   threshold TEXT,
   debounce_seconds INTEGER,      -- flap protection, see §6
-  notify_channel TEXT,
+  notify_channel_id TEXT,        -- FK -> notification_channels.id
+  enabled BOOLEAN
+);
+
+CREATE TABLE notification_channels (
+  id TEXT PRIMARY KEY,
+  type TEXT,                     -- 'telegram' only in v1
+  config_json TEXT,              -- non-secret config, e.g. {"chat_id": "..."}
+  secret_ref TEXT,                -- bot token lives in secrets.enc.json, same pattern as §3
   enabled BOOLEAN
 );
 
@@ -205,9 +213,13 @@ log, and 10 consecutive invalid lines (default) auto-disables the source and rai
 | GET | `/api/events?source=&limit=` | session | event feed |
 | GET | `/api/alerts?status=` | session | active/resolved alerts |
 | GET | `/api/alert-rules?source=` | session | list of alert rules |
-| POST | `/api/alert-rules` | session | `{source_id, target_name, condition, threshold, debounce_seconds, notify_channel}` |
+| POST | `/api/alert-rules` | session | `{source_id, target_name, condition, threshold, debounce_seconds, notify_channel_id}` |
 | PATCH | `/api/alert-rules/:id` | session | update/enable/disable a rule |
 | DELETE | `/api/alert-rules/:id` | session | remove a rule |
+| GET | `/api/notification-channels` | session | list of configured channels (never returns `secret_ref` value) |
+| POST | `/api/notification-channels` | session | `{type: "telegram", config: {chat_id}, bot_token}` → stores `bot_token` via the §3 secrets mechanism, returns channel with `secret_ref` |
+| PATCH | `/api/notification-channels/:id` | session | update config / enable / disable / rotate token |
+| DELETE | `/api/notification-channels/:id` | session | remove a channel (blocked if an enabled `alert_rules` row still references it) |
 | POST | `/api/auth/login` | none (this *is* the login) | admin password → session cookie |
 | POST | `/api/webhooks/:source_id` | source-scoped token | push-mode adapter data (dead-man-switch style) |
 | WS | `/api/stream` | session | live pub/sub feed of new Metric/Check/Event/Alert, filtered by subscribed `source_id`s |

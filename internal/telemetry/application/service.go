@@ -41,13 +41,25 @@ type SourceStatusUpdater interface {
 	MarkSeen(ctx context.Context, sourceID, status string) error
 }
 
+// AlertEvaluator is the port telemetry/application uses to hand new Metric/Check data and source
+// connectivity status to the alert router (internal/alertrouter/application.Service) for rule
+// evaluation, per docs/SPEC.md §6 — kept as a narrow port, not a direct import, mirroring
+// SourceStatusUpdater. Optional — a Service with no AlertEvaluator configured simply doesn't
+// evaluate alerts.
+type AlertEvaluator interface {
+	EvaluateMetric(ctx context.Context, sourceID, name string, value float64) error
+	EvaluateCheck(ctx context.Context, sourceID, name, status string) error
+	EvaluateSourceStatus(ctx context.Context, sourceID, status string) error
+}
+
 // Service implements telemetry ingest and query against the three domain repository ports.
 type Service struct {
-	metrics       domain.MetricRepository
-	checks        domain.CheckRepository
-	events        domain.EventRepository
-	publisher     Publisher
-	statusUpdater SourceStatusUpdater
+	metrics        domain.MetricRepository
+	checks         domain.CheckRepository
+	events         domain.EventRepository
+	publisher      Publisher
+	statusUpdater  SourceStatusUpdater
+	alertEvaluator AlertEvaluator
 }
 
 // Option configures optional Service dependencies.
@@ -62,6 +74,12 @@ func WithPublisher(pub Publisher) Option {
 // telemetry is ingested.
 func WithSourceStatusUpdater(updater SourceStatusUpdater) Option {
 	return func(s *Service) { s.statusUpdater = updater }
+}
+
+// WithAlertEvaluator wires evaluator to run alert-rule/source-status evaluation as telemetry is
+// ingested.
+func WithAlertEvaluator(evaluator AlertEvaluator) Option {
+	return func(s *Service) { s.alertEvaluator = evaluator }
 }
 
 // NewService wires a Service to its three repositories, plus any Options (e.g. WithPublisher).
@@ -89,6 +107,22 @@ func (s *Service) markSeen(ctx context.Context, sourceID, status string) {
 	}
 }
 
+// evaluateMetricAlerts and evaluateCheckAlerts are best-effort, mirroring markSeen: an evaluation
+// failure (e.g. a malformed rule threshold) must never fail an already-persisted ingest.
+func (s *Service) evaluateMetricAlerts(ctx context.Context, sourceID, name string, value float64) {
+	if s.alertEvaluator != nil {
+		_ = s.alertEvaluator.EvaluateMetric(ctx, sourceID, name, value)
+	}
+}
+
+func (s *Service) evaluateCheckAlerts(ctx context.Context, sourceID, name, status string) {
+	if s.alertEvaluator == nil {
+		return
+	}
+	_ = s.alertEvaluator.EvaluateCheck(ctx, sourceID, name, status)
+	_ = s.alertEvaluator.EvaluateSourceStatus(ctx, sourceID, sourceStatusForCheck(status))
+}
+
 // IngestMetric persists one metric point. ts is always stamped by the adapter runner
 // (docs/SPEC.md §3), never trusted from the adapter/remote host beyond what's already in ts.
 // Signature intentionally uses only stdlib types so it structurally satisfies
@@ -110,6 +144,7 @@ func (s *Service) IngestMetric(ctx context.Context, sourceID, name string, ts ti
 		return fmt.Errorf("telemetry: ingest metric: %w", err)
 	}
 	s.markSeen(ctx, sourceID, "")
+	s.evaluateMetricAlerts(ctx, sourceID, name, value)
 	s.publish(Frame{Type: "metric", SourceID: sourceID, Payload: map[string]any{
 		"source_id": sourceID, "name": name, "ts": ts.Format(time.RFC3339), "value": value, "labels": labelsJSON,
 	}})
@@ -134,6 +169,7 @@ func (s *Service) IngestCheck(ctx context.Context, sourceID, name string, ts tim
 		return fmt.Errorf("telemetry: ingest check: %w", err)
 	}
 	s.markSeen(ctx, sourceID, sourceStatusForCheck(status))
+	s.evaluateCheckAlerts(ctx, sourceID, name, status)
 	s.publish(Frame{Type: "check", SourceID: sourceID, Payload: map[string]any{
 		"source_id": sourceID, "name": name, "ts": ts.Format(time.RFC3339), "status": status, "meta": metaJSON,
 	}})

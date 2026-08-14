@@ -23,8 +23,12 @@ import (
 	adapterenginedomain "sre-kit/internal/adapterengine/domain"
 	adapterengineinfra "sre-kit/internal/adapterengine/infrastructure"
 	adapterenginehttp "sre-kit/internal/adapterengine/interfaces/http"
+	alertrouterapp "sre-kit/internal/alertrouter/application"
+	alertrouterinfra "sre-kit/internal/alertrouter/infrastructure"
+	alertrouterhttp "sre-kit/internal/alertrouter/interfaces/http"
 	authapp "sre-kit/internal/auth/application"
 	authhttp "sre-kit/internal/auth/interfaces/http"
+	"sre-kit/internal/notify/telegram"
 	"sre-kit/internal/platform/config"
 	"sre-kit/internal/platform/db"
 	"sre-kit/internal/platform/httpserver"
@@ -47,6 +51,17 @@ type hubPublisher struct {
 }
 
 func (p hubPublisher) Publish(frame telemetryapp.Frame) {
+	p.hub.Publish(wshub.Frame{Type: frame.Type, SourceID: frame.SourceID, Payload: frame.Payload})
+}
+
+// alertHubPublisher is hubPublisher's alertrouter counterpart — same composition-root translation
+// pattern, kept as a separate type since alertrouterapp.Frame and telemetryapp.Frame are distinct
+// dependency-free types (ports-over-direct-imports, docs/STACK.md).
+type alertHubPublisher struct {
+	hub *wshub.Hub
+}
+
+func (p alertHubPublisher) Publish(frame alertrouterapp.Frame) {
 	p.hub.Publish(wshub.Frame{Type: frame.Type, SourceID: frame.SourceID, Payload: frame.Payload})
 }
 
@@ -89,11 +104,21 @@ func main() {
 	sourcesService := sourcesapp.NewService(sourcesRepo)
 
 	hub := wshub.New()
+
+	alertrouterRepos := alertrouterinfra.NewSQLiteRepository(sqlDB)
+	alertrouterService := alertrouterapp.NewService(
+		alertrouterRepos.Alerts, alertrouterRepos.Rules, alertrouterRepos.Channels, secretsStore,
+		alertrouterapp.WithNotifier(telegram.NewClient()),
+		alertrouterapp.WithPublisher(alertHubPublisher{hub: hub}),
+	)
+	alertrouterhttp.NewHandlers(alertrouterService).Register(srv.Mux)
+
 	telemetryRepos := telemetryinfra.NewSQLiteRepository(sqlDB)
 	telemetryService := telemetryapp.NewService(
 		telemetryRepos.Metrics, telemetryRepos.Checks, telemetryRepos.Events,
 		telemetryapp.WithPublisher(hubPublisher{hub: hub}),
 		telemetryapp.WithSourceStatusUpdater(sourcesService),
+		telemetryapp.WithAlertEvaluator(alertrouterService),
 	)
 	telemetryhttp.NewHandlers(telemetryService, hub).Register(srv.Mux)
 

@@ -29,10 +29,21 @@ export type StreamEventPayload = {
   labels: string;
 };
 
+export type StreamAlertPayload = {
+  id: string;
+  source_id: string;
+  rule_id?: string;
+  severity: string;
+  message: string;
+  created_at: string;
+  resolved_at?: string;
+};
+
 export type StreamFrame =
   | { type: "metric"; source_id: string; payload: StreamMetricPayload }
   | { type: "check"; source_id: string; payload: StreamCheckPayload }
-  | { type: "event"; source_id: string; payload: StreamEventPayload };
+  | { type: "event"; source_id: string; payload: StreamEventPayload }
+  | { type: "alert"; source_id: string; payload: StreamAlertPayload };
 
 type Subscription = {
   onFrame: (frame: StreamFrame) => void;
