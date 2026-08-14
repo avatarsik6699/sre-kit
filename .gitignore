@@ -8,6 +8,7 @@ adapters/*/stub
 adapters/*/host-metrics-ssh
 adapters/*/uptime-http
 adapters/*/fail2ban-ssh
+adapters/*/journal-http
 
 # Secrets — never commit
 .env

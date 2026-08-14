@@ -1,0 +1,44 @@
+{
+  "name": "journal-http",
+  "version": "0.1.0",
+  "mode": "pull",
+  "emits": ["event"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "host": { "type": "string", "minLength": 1 },
+      "port": { "type": "integer", "default": 19531, "minimum": 1, "maximum": 65535 },
+      "https": { "type": "boolean", "default": false },
+      "client_cert": {
+        "type": "string",
+        "format": "secret",
+        "description": "secret_ref to a PEM-encoded client certificate, resolved by the core before the adapter is spawned. Optional — only needed when the target systemd-journal-gatewayd instance is configured with mTLS (--trust). Omit for plain HTTP/HTTPS access."
+      },
+      "client_key": {
+        "type": "string",
+        "format": "secret",
+        "description": "secret_ref to the PEM-encoded private key matching client_cert. Required together with client_cert, omitted together."
+      },
+      "unit": {
+        "type": "string",
+        "default": "",
+        "description": "Restrict to one systemd unit name (matched against _SYSTEMD_UNIT); empty string (default) means all units."
+      },
+      "min_priority": {
+        "type": "integer",
+        "default": 6,
+        "minimum": 0,
+        "maximum": 7,
+        "description": "Minimum syslog priority to report (0=emerg .. 7=debug, lower is more severe). Entries with a higher (less severe) PRIORITY are dropped."
+      },
+      "lookback_seconds": {
+        "type": "integer",
+        "default": 120,
+        "minimum": 1,
+        "description": "How far back each poll looks for journal entries, applied client-side against the last 2000 fetched entries."
+      }
+    },
+    "required": ["host"],
+    "additionalProperties": false
+  }
+}
