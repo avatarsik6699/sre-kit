@@ -1,0 +1,33 @@
+{
+  "name": "fail2ban-ssh",
+  "version": "0.1.0",
+  "mode": "pull",
+  "emits": ["event"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "host": { "type": "string", "minLength": 1 },
+      "port": { "type": "integer", "default": 22, "minimum": 1, "maximum": 65535 },
+      "username": { "type": "string", "minLength": 1 },
+      "auth_method": { "type": "string", "enum": ["password", "private_key"] },
+      "secret": {
+        "type": "string",
+        "format": "secret",
+        "description": "secret_ref to the SSH password or PEM-encoded private key, resolved by the core before the adapter is spawned — never a plaintext value at rest."
+      },
+      "jail": {
+        "type": "string",
+        "default": "",
+        "description": "Restrict to one fail2ban jail name; empty string (default) means all jails."
+      },
+      "lookback_seconds": {
+        "type": "integer",
+        "default": 120,
+        "minimum": 1,
+        "description": "How far back each poll looks for ban/unban log lines."
+      }
+    },
+    "required": ["host", "username", "auth_method", "secret"],
+    "additionalProperties": false
+  }
+}
