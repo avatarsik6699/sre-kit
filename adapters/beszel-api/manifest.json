@@ -26,6 +26,11 @@
         "format": "secret",
         "description": "secret_ref to the Beszel account password, resolved by the core before the adapter is spawned — never a plaintext value at rest."
       },
+      "auth_collection": {
+        "type": "string",
+        "default": "_superusers",
+        "description": "PocketBase collection to authenticate against. \"_superusers\" (default) for an account provisioned via Beszel's CLI (`beszel superuser upsert`) — the only kind provisionable without the Beszel web UI. Use \"users\" for a regular dashboard account created through the web UI."
+      },
       "lookback_seconds": {
         "type": "integer",
         "default": 120,

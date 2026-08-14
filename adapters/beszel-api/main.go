@@ -29,6 +29,7 @@ type config struct {
 	SystemID        string `json:"system_id"`
 	Email           string `json:"email"`
 	Password        string `json:"password"`
+	AuthCollection  string `json:"auth_collection"`
 	LookbackSeconds int    `json:"lookback_seconds"`
 }
 
@@ -92,6 +93,9 @@ func main() {
 	if cfg.LookbackSeconds <= 0 {
 		cfg.LookbackSeconds = 120
 	}
+	if cfg.AuthCollection == "" {
+		cfg.AuthCollection = "_superusers"
+	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
 
@@ -122,15 +126,21 @@ func main() {
 	}
 }
 
-// authenticate performs PocketBase's auth-with-password against the "users" collection and returns
-// the bearer token. Re-authenticates on every run (stateless pull-mode subprocess, no token caching
+// authenticate performs PocketBase's auth-with-password against cfg.AuthCollection and returns the
+// bearer token. Re-authenticates on every run (stateless pull-mode subprocess, no token caching
 // between invocations — same precedent as journal-http's stateless design).
+//
+// The collection is configurable, not hardcoded to "users": live-verified against a real Beszel
+// instance (v0.18.7) that an account provisioned via Beszel's CLI (`beszel superuser upsert` — the
+// only account-provisioning path without its web UI) lives in PocketBase's built-in `_superusers`
+// collection, not `users`; a `users`-collection auth attempt with those same credentials returns a
+// generic 400, only `_superusers` succeeds.
 func authenticate(client *http.Client, cfg config) (string, error) {
 	body, err := json.Marshal(map[string]string{"identity": cfg.Email, "password": cfg.Password})
 	if err != nil {
 		return "", fmt.Errorf("encode request body: %w", err)
 	}
-	u := strings.TrimRight(cfg.BaseURL, "/") + "/api/collections/users/auth-with-password"
+	u := fmt.Sprintf("%s/api/collections/%s/auth-with-password", strings.TrimRight(cfg.BaseURL, "/"), cfg.AuthCollection)
 	req, err := http.NewRequest(http.MethodPost, u, bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("build request: %w", err)
