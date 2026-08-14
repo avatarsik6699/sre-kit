@@ -10,6 +10,7 @@ adapters/*/uptime-http
 adapters/*/fail2ban-ssh
 adapters/*/journal-http
 adapters/*/beszel-api
+adapters/*/umami-http
 
 # Secrets — never commit
 .env

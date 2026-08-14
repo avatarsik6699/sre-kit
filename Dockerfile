@@ -19,6 +19,7 @@ RUN CGO_ENABLED=0 go build -o /out/adapters/uptime-http/uptime-http ./adapters/u
 RUN CGO_ENABLED=0 go build -o /out/adapters/fail2ban-ssh/fail2ban-ssh ./adapters/fail2ban-ssh
 RUN CGO_ENABLED=0 go build -o /out/adapters/journal-http/journal-http ./adapters/journal-http
 RUN CGO_ENABLED=0 go build -o /out/adapters/beszel-api/beszel-api ./adapters/beszel-api
+RUN CGO_ENABLED=0 go build -o /out/adapters/umami-http/umami-http ./adapters/umami-http
 
 FROM alpine:3.20
 RUN addgroup -S sre-kit && adduser -S -G sre-kit sre-kit
@@ -37,6 +38,8 @@ COPY --from=build /out/adapters/journal-http/journal-http ./adapters/journal-htt
 COPY adapters/journal-http/manifest.json ./adapters/journal-http/manifest.json
 COPY --from=build /out/adapters/beszel-api/beszel-api ./adapters/beszel-api/beszel-api
 COPY adapters/beszel-api/manifest.json ./adapters/beszel-api/manifest.json
+COPY --from=build /out/adapters/umami-http/umami-http ./adapters/umami-http/umami-http
+COPY adapters/umami-http/manifest.json ./adapters/umami-http/manifest.json
 
 RUN mkdir -p /app/data && chown -R sre-kit:sre-kit /app
 USER sre-kit

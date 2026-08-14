@@ -50,7 +50,10 @@ Success metrics for v1:
 | Unified data contract: Metric, Check, Event, Alert | `Action` primitive (reverse commands — unban IP, restart container) — reserved for v2/v3, see §2.2 |
 | `host-metrics-ssh` adapter (CPU/RAM/disk/network via SSH) | Docker container adapter |
 | `uptime-http` adapter (HTTP/TCP check + TLS expiry) | Backup / dead-man-switch adapter |
-| `fail2ban-ssh` adapter (optional, time-permitting) | Web analytics adapter (Umami-style) |
+| `fail2ban-ssh` adapter (optional, time-permitting) | |
+| `journal-http` adapter (systemd-journal-gatewayd) | |
+| `beszel-api` adapter (host + per-container metrics via PocketBase) | |
+| `umami-http` adapter (web analytics, Umami-style) — added post-M6, contract proven on 5 prior adapters (§10) | |
 | Live dashboard via WebSocket push (Sources, Dashboard, Source detail) | Multi-user / RBAC / audit log |
 | Alert rules with single Telegram notification channel | Escalation / repeat notifications on unresolved alerts |
 | Single admin-password auth | OAuth / full user management |
@@ -409,8 +412,9 @@ deploy verification step is not yet defined; this is an open item (§11).
 - Multi-tenant / RBAC — single user, single instance, for v1.
 - The `Action` primitive (reverse commands: unban IP, restart container, etc.) — reserved for
   v2/v3; the contract must stay additive-only so adding it later isn't a breaking change.
-- Docker-container adapter, backup/dead-man-switch adapter, web-analytics adapter — second
-  iteration, after the contract is proven on the first 2–3 adapters.
+- Docker-container adapter, backup/dead-man-switch adapter — second iteration, after the contract
+  is proven on the first 2–3 adapters. (The web-analytics adapter this list originally deferred
+  alongside them shipped as `umami-http` in change-11, once that condition was met — see §1.3.)
 - Pagination/retention policy tooling beyond simple TTL deletion.
 - Escalation/repeat notifications for unresolved alerts.
 - Adapter sandboxing — accepted risk while all adapters are first-party (see §11).
