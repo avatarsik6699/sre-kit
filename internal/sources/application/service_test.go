@@ -2,7 +2,9 @@ package application_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -245,5 +247,169 @@ func TestMarkSeen_UnknownIDReturnsErrNotFound(t *testing.T) {
 	svc := application.NewService(newFakeRepo())
 	if err := svc.MarkSeen(context.Background(), "does-not-exist", domain.StatusOK); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("MarkSeen unknown id: got %v, want ErrNotFound", err)
+	}
+}
+
+// --- secret_ref resolution (docs/changes/07-source-secret-ref-fix.md) ---
+
+type fakeSecretsStore struct {
+	nextID      int
+	values      map[string]string
+	putCalls    []string
+	deleteCalls []string
+}
+
+func newFakeSecretsStore() *fakeSecretsStore {
+	return &fakeSecretsStore{values: map[string]string{}}
+}
+
+func (f *fakeSecretsStore) Put(value string) (string, error) {
+	f.nextID++
+	ref := fmt.Sprintf("ref-%d", f.nextID)
+	f.values[ref] = value
+	f.putCalls = append(f.putCalls, value)
+	return ref, nil
+}
+
+func (f *fakeSecretsStore) Delete(ref string) error {
+	delete(f.values, ref)
+	f.deleteCalls = append(f.deleteCalls, ref)
+	return nil
+}
+
+var hostMetricsSSHSchema = json.RawMessage(`{
+	"properties": {
+		"host": {"type": "string"},
+		"secret": {"type": "string", "format": "secret"}
+	}
+}`)
+
+func fixedSchemaLookup(schema json.RawMessage, err error) application.AdapterConfigSchemaLookup {
+	return func(context.Context, string) (json.RawMessage, error) { return schema, err }
+}
+
+func configField(t *testing.T, configJSON, field string) string {
+	t.Helper()
+	var config map[string]string
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		t.Fatalf("parse config %q: %v", configJSON, err)
+	}
+	return config[field]
+}
+
+func TestCreate_ResolvesSecretFieldToRef(t *testing.T) {
+	store := newFakeSecretsStore()
+	svc := application.NewService(newFakeRepo(),
+		application.WithSecrets(store),
+		application.WithAdapterConfigSchemas(fixedSchemaLookup(hostMetricsSSHSchema, nil)),
+	)
+
+	source, err := svc.Create(context.Background(), "host-metrics-ssh", `{"host":"1.2.3.4","secret":"hunter2"}`)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if len(store.putCalls) != 1 || store.putCalls[0] != "hunter2" {
+		t.Fatalf("Put calls = %+v, want one call with the plaintext secret", store.putCalls)
+	}
+	ref := configField(t, source.ConfigJSON, "secret")
+	if ref == "hunter2" || ref == "" {
+		t.Fatalf("stored config secret field = %q, want a ref, not the plaintext value", ref)
+	}
+	if configField(t, source.ConfigJSON, "host") != "1.2.3.4" {
+		t.Fatalf("stored config host field changed unexpectedly: %s", source.ConfigJSON)
+	}
+}
+
+func TestCreate_UnknownAdapterLeavesConfigUnchanged(t *testing.T) {
+	store := newFakeSecretsStore()
+	svc := application.NewService(newFakeRepo(),
+		application.WithSecrets(store),
+		application.WithAdapterConfigSchemas(fixedSchemaLookup(nil, fmt.Errorf("adapter %q not installed", "host-metrics-ssh"))),
+	)
+
+	source, err := svc.Create(context.Background(), "host-metrics-ssh", `{"secret":"hunter2"}`)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if len(store.putCalls) != 0 {
+		t.Fatalf("Put calls = %+v, want none for an unresolvable adapter schema", store.putCalls)
+	}
+	if configField(t, source.ConfigJSON, "secret") != "hunter2" {
+		t.Fatalf("config = %s, want the plaintext value left untouched", source.ConfigJSON)
+	}
+}
+
+func TestCreate_NoSecretsWiredLeavesConfigUnchanged(t *testing.T) {
+	svc := application.NewService(newFakeRepo())
+	source, err := svc.Create(context.Background(), "host-metrics-ssh", `{"secret":"hunter2"}`)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if configField(t, source.ConfigJSON, "secret") != "hunter2" {
+		t.Fatalf("config = %s, want the plaintext value left untouched when no SecretsStore is wired", source.ConfigJSON)
+	}
+}
+
+func TestUpdate_UnchangedSecretFieldIsNotRewrapped(t *testing.T) {
+	store := newFakeSecretsStore()
+	svc := application.NewService(newFakeRepo(),
+		application.WithSecrets(store),
+		application.WithAdapterConfigSchemas(fixedSchemaLookup(hostMetricsSSHSchema, nil)),
+	)
+
+	source, err := svc.Create(context.Background(), "host-metrics-ssh", `{"host":"1.2.3.4","secret":"hunter2"}`)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if len(store.putCalls) != 1 {
+		t.Fatalf("Put calls after Create = %+v, want exactly one", store.putCalls)
+	}
+
+	// Resubmit the config exactly as returned (the ref, not a new plaintext value) — as an edit
+	// flow that round-trips an unmodified field would.
+	updated, err := svc.Update(context.Background(), source.ID, &source.ConfigJSON, nil)
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if len(store.putCalls) != 1 {
+		t.Fatalf("Put calls after no-op Update = %+v, want still exactly one (unchanged field must not be re-wrapped)", store.putCalls)
+	}
+	if len(store.deleteCalls) != 0 {
+		t.Fatalf("Delete calls = %+v, want none for an unchanged field", store.deleteCalls)
+	}
+	if configField(t, updated.ConfigJSON, "secret") != configField(t, source.ConfigJSON, "secret") {
+		t.Fatalf("ref changed on a no-op update: %s -> %s", source.ConfigJSON, updated.ConfigJSON)
+	}
+}
+
+func TestUpdate_ChangedSecretFieldRotatesRefAndDeletesOld(t *testing.T) {
+	store := newFakeSecretsStore()
+	svc := application.NewService(newFakeRepo(),
+		application.WithSecrets(store),
+		application.WithAdapterConfigSchemas(fixedSchemaLookup(hostMetricsSSHSchema, nil)),
+	)
+
+	source, err := svc.Create(context.Background(), "host-metrics-ssh", `{"host":"1.2.3.4","secret":"hunter2"}`)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	oldRef := configField(t, source.ConfigJSON, "secret")
+
+	newConfig := `{"host":"1.2.3.4","secret":"new-password"}`
+	updated, err := svc.Update(context.Background(), source.ID, &newConfig, nil)
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	if len(store.putCalls) != 2 || store.putCalls[1] != "new-password" {
+		t.Fatalf("Put calls = %+v, want a second call storing the new plaintext value", store.putCalls)
+	}
+	newRef := configField(t, updated.ConfigJSON, "secret")
+	if newRef == oldRef || newRef == "new-password" {
+		t.Fatalf("new ref = %q, want a fresh ref distinct from %q and the plaintext value", newRef, oldRef)
+	}
+	if len(store.deleteCalls) != 1 || store.deleteCalls[0] != oldRef {
+		t.Fatalf("Delete calls = %+v, want exactly one deleting the superseded ref %q", store.deleteCalls, oldRef)
 	}
 }

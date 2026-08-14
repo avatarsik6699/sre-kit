@@ -4,6 +4,10 @@
 *.db-wal
 *.db-shm
 /.swagger-gen/
+adapters/*/stub
+adapters/*/host-metrics-ssh
+adapters/*/uptime-http
+adapters/*/fail2ban-ssh
 
 # Secrets — never commit
 .env

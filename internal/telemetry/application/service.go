@@ -37,7 +37,9 @@ type Publisher interface {
 // SourceStatusUpdater configured simply doesn't touch source rollup state.
 type SourceStatusUpdater interface {
 	// MarkSeen updates sourceID's last_seen_at to now and, when status is non-empty, its
-	// last_status. status is "" for metric/event ingestion (only checks carry a status).
+	// last_status. Metric/event ingestion passes "ok" (a source that's successfully emitting
+	// telemetry is, by definition, reachable — see sourceStatusForCheck for how a check's finer
+	// "ok"/"warn"/"critical" verdict maps down to this same coarser enum).
 	MarkSeen(ctx context.Context, sourceID, status string) error
 }
 
@@ -143,7 +145,7 @@ func (s *Service) IngestMetric(ctx context.Context, sourceID, name string, ts ti
 	if err := s.metrics.Insert(ctx, metric); err != nil {
 		return fmt.Errorf("telemetry: ingest metric: %w", err)
 	}
-	s.markSeen(ctx, sourceID, "")
+	s.markSeen(ctx, sourceID, "ok")
 	s.evaluateMetricAlerts(ctx, sourceID, name, value)
 	s.publish(Frame{Type: "metric", SourceID: sourceID, Payload: map[string]any{
 		"source_id": sourceID, "name": name, "ts": ts.Format(time.RFC3339), "value": value, "labels": labelsJSON,
@@ -206,7 +208,7 @@ func (s *Service) IngestEvent(ctx context.Context, sourceID string, ts time.Time
 	if err := s.events.Insert(ctx, event); err != nil {
 		return fmt.Errorf("telemetry: ingest event: %w", err)
 	}
-	s.markSeen(ctx, sourceID, "")
+	s.markSeen(ctx, sourceID, "ok")
 	s.publish(Frame{Type: "event", SourceID: sourceID, Payload: map[string]any{
 		"source_id": sourceID, "ts": ts.Format(time.RFC3339), "level": level, "message": message, "labels": labelsJSON,
 	}})
