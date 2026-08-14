@@ -114,6 +114,7 @@ func TestToNDJSON_NilRecordsProduceNothing(t *testing.T) {
 // httptest.Server technique (I3) rather than requiring a real Beszel instance.
 type fakePocketBase struct {
 	wantEmail, wantPassword string
+	wantAuthCollection      string // defaults to "_superusers" if empty, see handler()
 	token                   string
 	systemStatsBody         string
 	containerStatsBody      string
@@ -121,9 +122,14 @@ type fakePocketBase struct {
 }
 
 func (f *fakePocketBase) handler() http.HandlerFunc {
+	wantCollection := f.wantAuthCollection
+	if wantCollection == "" {
+		wantCollection = "_superusers"
+	}
+	authPath := fmt.Sprintf("/api/collections/%s/auth-with-password", wantCollection)
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/api/collections/users/auth-with-password":
+		case r.URL.Path == authPath:
 			var body struct{ Identity, Password string }
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			if f.rejectAuth || body.Identity != f.wantEmail || body.Password != f.wantPassword {
@@ -155,7 +161,7 @@ func TestAuthenticate_Success(t *testing.T) {
 	server := httptest.NewServer(fake.handler())
 	defer server.Close()
 
-	token, err := authenticate(&http.Client{}, config{BaseURL: server.URL, Email: "admin@example.com", Password: "s3cret"})
+	token, err := authenticate(&http.Client{}, config{BaseURL: server.URL, Email: "admin@example.com", Password: "s3cret", AuthCollection: "_superusers"})
 	if err != nil {
 		t.Fatalf("authenticate: %v", err)
 	}
@@ -169,8 +175,22 @@ func TestAuthenticate_RejectedCredentials(t *testing.T) {
 	server := httptest.NewServer(fake.handler())
 	defer server.Close()
 
-	if _, err := authenticate(&http.Client{}, config{BaseURL: server.URL, Email: "admin@example.com", Password: "wrong"}); err == nil {
+	if _, err := authenticate(&http.Client{}, config{BaseURL: server.URL, Email: "admin@example.com", Password: "wrong", AuthCollection: "_superusers"}); err == nil {
 		t.Fatal("expected an error for rejected credentials")
+	}
+}
+
+func TestAuthenticate_NonDefaultCollection(t *testing.T) {
+	fake := &fakePocketBase{wantEmail: "viewer@example.com", wantPassword: "s3cret", wantAuthCollection: "users", token: "tok-456"}
+	server := httptest.NewServer(fake.handler())
+	defer server.Close()
+
+	token, err := authenticate(&http.Client{}, config{BaseURL: server.URL, Email: "viewer@example.com", Password: "s3cret", AuthCollection: "users"})
+	if err != nil {
+		t.Fatalf("authenticate: %v", err)
+	}
+	if token != "tok-456" {
+		t.Fatalf("got token %q", token)
 	}
 }
 
