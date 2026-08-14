@@ -15,6 +15,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -100,8 +102,29 @@ func main() {
 	authhttp.NewHandlers(authService).Register(srv.Mux)
 	srv.Use(authhttp.RequireSession(authService))
 
+	// adapterConfigSchema resolves an adapter's config_schema by name so sourcesService can tell
+	// which config fields are secrets (docs/changes/07-source-secret-ref-fix.md) — reuses the same
+	// ListInstalled lookup reconcileSchedule does below, by adapter name rather than pull-mode
+	// job info. sourcesService deliberately doesn't import adapterengine directly (ports, not
+	// direct imports).
+	adapterConfigSchema := func(_ context.Context, adapterName string) (json.RawMessage, error) {
+		installed, err := adapterengineapp.ListInstalled(cfg.AdaptersDir)
+		if err != nil {
+			return nil, err
+		}
+		for _, adapter := range installed {
+			if adapter.Manifest.Name == adapterName {
+				return adapter.Manifest.ConfigSchema, nil
+			}
+		}
+		return nil, fmt.Errorf("adapter %q not installed", adapterName)
+	}
+
 	sourcesRepo := sourcesinfra.NewSQLiteRepository(sqlDB)
-	sourcesService := sourcesapp.NewService(sourcesRepo)
+	sourcesService := sourcesapp.NewService(sourcesRepo,
+		sourcesapp.WithSecrets(secretsStore),
+		sourcesapp.WithAdapterConfigSchemas(adapterConfigSchema),
+	)
 
 	hub := wshub.New()
 

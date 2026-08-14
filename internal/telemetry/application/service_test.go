@@ -98,27 +98,27 @@ func (f *fakeStatusUpdater) MarkSeen(_ context.Context, sourceID, status string)
 	return nil
 }
 
-func TestIngestMetric_MarksSeenWithNoStatus(t *testing.T) {
+func TestIngestMetric_MarksSeenOK(t *testing.T) {
 	updater := &fakeStatusUpdater{}
 	svc := application.NewService(&fakeMetricRepo{}, &fakeCheckRepo{}, &fakeEventRepo{}, application.WithSourceStatusUpdater(updater))
 
 	if err := svc.IngestMetric(context.Background(), "src-1", "cpu.usage_percent", time.Now(), 1, nil); err != nil {
 		t.Fatalf("IngestMetric: %v", err)
 	}
-	if len(updater.calls) != 1 || updater.calls[0] != (statusUpdateCall{sourceID: "src-1", status: ""}) {
-		t.Fatalf("MarkSeen calls = %+v, want one call with empty status", updater.calls)
+	if len(updater.calls) != 1 || updater.calls[0] != (statusUpdateCall{sourceID: "src-1", status: "ok"}) {
+		t.Fatalf("MarkSeen calls = %+v, want one call with status \"ok\"", updater.calls)
 	}
 }
 
-func TestIngestEvent_MarksSeenWithNoStatus(t *testing.T) {
+func TestIngestEvent_MarksSeenOK(t *testing.T) {
 	updater := &fakeStatusUpdater{}
 	svc := application.NewService(&fakeMetricRepo{}, &fakeCheckRepo{}, &fakeEventRepo{}, application.WithSourceStatusUpdater(updater))
 
 	if err := svc.IngestEvent(context.Background(), "src-1", time.Now(), "warn", "msg", nil); err != nil {
 		t.Fatalf("IngestEvent: %v", err)
 	}
-	if len(updater.calls) != 1 || updater.calls[0] != (statusUpdateCall{sourceID: "src-1", status: ""}) {
-		t.Fatalf("MarkSeen calls = %+v, want one call with empty status", updater.calls)
+	if len(updater.calls) != 1 || updater.calls[0] != (statusUpdateCall{sourceID: "src-1", status: "ok"}) {
+		t.Fatalf("MarkSeen calls = %+v, want one call with status \"ok\"", updater.calls)
 	}
 }
 
