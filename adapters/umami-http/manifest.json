@@ -1,0 +1,39 @@
+{
+  "name": "umami-http",
+  "version": "0.1.0",
+  "mode": "pull",
+  "emits": ["metric"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "base_url": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Umami's base URL, e.g. http://10.77.0.1:3001 (no trailing slash)."
+      },
+      "website_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The Umami-internal website identifier. Found in the Umami UI's website settings page (its URL contains the website's id)."
+      },
+      "username": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Umami account username used for /api/auth/login."
+      },
+      "password": {
+        "type": "string",
+        "format": "secret",
+        "description": "secret_ref to the Umami account password, resolved by the core before the adapter is spawned — never a plaintext value at rest."
+      },
+      "lookback_seconds": {
+        "type": "integer",
+        "default": 3600,
+        "minimum": 1,
+        "description": "How far back each poll's traffic-stats window looks. Longer than the infra adapters' default since a short window reads mostly zeros for a low-traffic site."
+      }
+    },
+    "required": ["base_url", "website_id", "username", "password"],
+    "additionalProperties": false
+  }
+}
