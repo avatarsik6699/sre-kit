@@ -6,6 +6,7 @@ import { mantineThemeConstants } from "~/shared/config/mantine-theme";
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: "◧" },
   { to: "/sources", label: "Sources", icon: "▤" },
+  { to: "/hosts", label: "Hosts", icon: "▣" },
   { to: "/notifications", label: "Notifications", icon: "◔" },
 ] as const;
 

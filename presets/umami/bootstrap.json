@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "type": "http_call",
+      "method": "POST",
+      "path_template": "/api/auth/login",
+      "body_template": "{\"username\":\"admin\",\"password\":\"umami\"}",
+      "capture_field": "token",
+      "capture_as": "token"
+    },
+    {
+      "type": "http_call",
+      "method": "POST",
+      "path_template": "/api/me/password",
+      "auth_from_field": "token",
+      "body_template": "{\"currentPassword\":\"umami\",\"newPassword\":\"{{.AdminPassword}}\"}"
+    },
+    {
+      "type": "http_call",
+      "method": "POST",
+      "path_template": "/api/websites",
+      "auth_from_field": "token",
+      "body_template": "{\"name\":\"{{.HostAddress}}\",\"domain\":\"{{.HostAddress}}\"}",
+      "capture_field": "id",
+      "capture_as": "website_id"
+    }
+  ]
+}

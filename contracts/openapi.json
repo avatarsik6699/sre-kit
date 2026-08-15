@@ -541,6 +541,315 @@
         }
       }
     },
+    "/api/hosts": {
+      "get": {
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "description": "List every configured host and its connection status",
+        "tags": [
+          "hosts"
+        ],
+        "summary": "List hosts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/internal_hosts_interfaces_http.hostResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "description": "Register an SSH-reachable deploy target; ssh_key is stored via the secret_ref mechanism, never returned",
+        "tags": [
+          "hosts"
+        ],
+        "summary": "Create a host",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_hosts_interfaces_http.createHostRequest"
+              }
+            }
+          },
+          "description": "label, address, ssh_port, ssh_user, ssh_key",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_hosts_interfaces_http.hostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hosts/{id}": {
+      "delete": {
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "description": "Remove a configured host permanently, along with its stored SSH key",
+        "tags": [
+          "hosts"
+        ],
+        "summary": "Delete a host",
+        "parameters": [
+          {
+            "description": "host ID",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hosts/{id}/check-connection": {
+      "post": {
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "description": "Dials the host, pins its host-key fingerprint on first connect (refuses a later mismatch), and probes Docker availability",
+        "tags": [
+          "hosts"
+        ],
+        "summary": "Check a host's SSH connection",
+        "parameters": [
+          {
+            "description": "host ID",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_hosts_interfaces_http.hostResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hosts/{id}/provision": {
+      "post": {
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "description": "Runs the provisioning workflow synchronously (deploy, bootstrap, register) and returns its final state",
+        "tags": [
+          "provisioning"
+        ],
+        "summary": "Deploy a preset to a host",
+        "parameters": [
+          {
+            "description": "host ID",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_provisioner_interfaces_http.provisionRequest"
+              }
+            }
+          },
+          "description": "preset_name",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_provisioner_interfaces_http.runResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/metrics": {
       "get": {
         "security": [
@@ -841,6 +1150,189 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/internal_alertrouter_interfaces_http.notificationChannelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/presets": {
+      "get": {
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "description": "List every preset found under the presets directory, with its manifest",
+        "tags": [
+          "provisioning"
+        ],
+        "summary": "List installed presets",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/internal_provisioner_interfaces_http.presetResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/provisioning-runs": {
+      "get": {
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "tags": [
+          "provisioning"
+        ],
+        "summary": "List provisioning runs for a host",
+        "parameters": [
+          {
+            "description": "host ID",
+            "name": "host",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/internal_provisioner_interfaces_http.runResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/provisioning-runs/{id}/retry": {
+      "post": {
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "description": "Resumes from the run's last completed step rather than restarting (docs/SPEC.md §12.4)",
+        "tags": [
+          "provisioning"
+        ],
+        "summary": "Retry a failed provisioning run",
+        "parameters": [
+          {
+            "description": "run ID",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_provisioner_interfaces_http.runResponse"
                 }
               }
             }
@@ -1337,6 +1829,112 @@
         "type": "object",
         "properties": {
           "password": {
+            "type": "string"
+          }
+        }
+      },
+      "internal_hosts_interfaces_http.createHostRequest": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "ssh_key": {
+            "type": "string"
+          },
+          "ssh_port": {
+            "type": "integer"
+          },
+          "ssh_user": {
+            "type": "string"
+          }
+        }
+      },
+      "internal_hosts_interfaces_http.hostResponse": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "docker_available": {
+            "type": "boolean"
+          },
+          "host_key_fingerprint": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "last_connected_at": {
+            "type": "string"
+          },
+          "last_status": {
+            "type": "string"
+          },
+          "ssh_port": {
+            "type": "integer"
+          },
+          "ssh_user": {
+            "type": "string"
+          }
+        }
+      },
+      "internal_provisioner_interfaces_http.presetResponse": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "produces_adapter": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "internal_provisioner_interfaces_http.provisionRequest": {
+        "type": "object",
+        "properties": {
+          "preset_name": {
+            "type": "string"
+          }
+        }
+      },
+      "internal_provisioner_interfaces_http.runResponse": {
+        "type": "object",
+        "properties": {
+          "error_message": {
+            "type": "string"
+          },
+          "finished_at": {
+            "type": "string"
+          },
+          "host_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "preset_name": {
+            "type": "string"
+          },
+          "produced_source_id": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "step": {
             "type": "string"
           }
         }
