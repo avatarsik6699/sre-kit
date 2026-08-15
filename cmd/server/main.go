@@ -30,12 +30,18 @@ import (
 	alertrouterhttp "sre-kit/internal/alertrouter/interfaces/http"
 	authapp "sre-kit/internal/auth/application"
 	authhttp "sre-kit/internal/auth/interfaces/http"
+	hostsapp "sre-kit/internal/hosts/application"
+	hostsinfra "sre-kit/internal/hosts/infrastructure"
+	hostshttp "sre-kit/internal/hosts/interfaces/http"
 	"sre-kit/internal/notify/telegram"
 	"sre-kit/internal/platform/config"
 	"sre-kit/internal/platform/db"
 	"sre-kit/internal/platform/httpserver"
 	"sre-kit/internal/platform/secrets"
 	"sre-kit/internal/platform/wshub"
+	provisionerapp "sre-kit/internal/provisioner/application"
+	provisionerinfra "sre-kit/internal/provisioner/infrastructure"
+	provisionerhttp "sre-kit/internal/provisioner/interfaces/http"
 	sourcesapp "sre-kit/internal/sources/application"
 	sourcesdomain "sre-kit/internal/sources/domain"
 	sourcesinfra "sre-kit/internal/sources/infrastructure"
@@ -213,6 +219,48 @@ func main() {
 
 	sourceshttp.NewHandlers(sourcesService).Register(srv.Mux)
 	adapterenginehttp.NewHandlers(cfg.AdaptersDir).Register(srv.Mux)
+
+	// Observability Auto-Provisioning (docs/SPEC.md §12, added post-M6). internal/hosts and
+	// internal/provisioner deliberately don't import internal/sources directly — sourceCreator
+	// below is the same ports-not-direct-imports pattern used throughout this composition root.
+	hostsRepo := hostsinfra.NewSQLiteRepository(sqlDB)
+	hostsService := hostsapp.NewService(hostsRepo, secretsStore, hostsapp.WithProber(hostsinfra.NewSSHProber()))
+	hostshttp.NewHandlers(hostsService).Register(srv.Mux)
+
+	// hostsLookup resolves a Host's SSH connection info for the provisioner — the private key is
+	// resolved from its secret_ref here, at the point of use, same rule §3 gives adapter config
+	// (never persisted or logged past this point). ExpectedFingerprint carries whatever
+	// internal/hosts's CheckConnection has pinned; empty until the host has been checked at least
+	// once, which provisionerinfra.SSHRunner refuses to dial without (docs/SPEC.md §12.4).
+	hostsLookup := func(ctx context.Context, hostID string) (provisionerapp.HostConn, error) {
+		host, err := hostsService.Get(ctx, hostID)
+		if err != nil {
+			return provisionerapp.HostConn{}, err
+		}
+		keyPEM, err := secretsStore.Get(host.SSHKeySecretRef)
+		if err != nil {
+			return provisionerapp.HostConn{}, fmt.Errorf("hosts: resolve ssh key: %w", err)
+		}
+		return provisionerapp.HostConn{
+			ID:                  host.ID,
+			Address:             host.Address,
+			Port:                host.SSHPort,
+			User:                host.SSHUser,
+			PrivateKeyPEM:       keyPEM,
+			ExpectedFingerprint: host.HostKeyFingerprint,
+		}, nil
+	}
+	sourceCreator := func(ctx context.Context, adapterName string, configJSON string) (string, error) {
+		source, err := sourcesService.Create(ctx, adapterName, configJSON)
+		if err != nil {
+			return "", err
+		}
+		return source.ID, nil
+	}
+
+	provisionerRepo := provisionerinfra.NewSQLiteRepository(sqlDB)
+	provisionerService := provisionerapp.NewService(provisionerRepo, hostsLookup, provisionerinfra.NewSSHRunner(), secretsStore, sourceCreator, cfg.PresetsDir)
+	provisionerhttp.NewHandlers(provisionerService, cfg.PresetsDir).Register(srv.Mux)
 
 	log.Printf("listening on %s", cfg.Addr)
 	if err := srv.Start(); err != nil {

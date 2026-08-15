@@ -20,6 +20,9 @@ type Config struct {
 	SecretsKey string
 	// AdaptersDir is the directory the adapter engine scans for installed adapter subprocesses.
 	AdaptersDir string
+	// PresetsDir is the directory internal/provisioner scans for installed observability presets
+	// (docs/SPEC.md §12.3), added post-M6.
+	PresetsDir string
 }
 
 const (
@@ -28,6 +31,7 @@ const (
 	envSecretsPath = "SRE_KIT_SECRETS_PATH"
 	envSecretsKey  = "SRE_KIT_SECRETS_KEY"
 	envAdaptersDir = "SRE_KIT_ADAPTERS_DIR"
+	envPresetsDir  = "SRE_KIT_PRESETS_DIR"
 )
 
 // Load reads Config from the process environment, applying defaults for everything except
@@ -39,6 +43,7 @@ func Load() (Config, error) {
 		SecretsPath: getOr(envSecretsPath, "./data/secrets.enc.json"),
 		SecretsKey:  os.Getenv(envSecretsKey),
 		AdaptersDir: getOr(envAdaptersDir, "./adapters"),
+		PresetsDir:  getOr(envPresetsDir, "./presets"),
 	}
 	if cfg.SecretsKey == "" {
 		return Config{}, fmt.Errorf("config: %s is required (secrets store encryption key)", envSecretsKey)
