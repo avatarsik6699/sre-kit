@@ -31,6 +31,12 @@
         "default": 3600,
         "minimum": 1,
         "description": "How far back each poll's traffic-stats window looks. Longer than the infra adapters' default since a short window reads mostly zeros for a low-traffic site."
+      },
+      "tracked_events": {
+        "type": "array",
+        "items": { "type": "string" },
+        "default": [],
+        "description": "Optional list of Umami custom event names to track. For each name, one analytics.event_count metric is emitted per poll (labels: {event: <name>}), counting matching events within lookback_seconds. Fully generic — sre-kit has no built-in notion of which events matter; supply whatever event names your own site emits (e.g. a signup funnel's steps)."
       }
     },
     "required": ["base_url", "website_id", "username", "password"],
