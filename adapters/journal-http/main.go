@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -24,14 +25,15 @@ import (
 // fields already resolved from secret_refs to plaintext PEM by the core (see
 // internal/platform/secrets.ResolveConfig) — this process never sees a secret_ref.
 type config struct {
-	Host            string `json:"host"`
-	Port            int    `json:"port"`
-	HTTPS           bool   `json:"https"`
-	ClientCert      string `json:"client_cert"`
-	ClientKey       string `json:"client_key"`
-	Unit            string `json:"unit"`
-	MinPriority     *int   `json:"min_priority"`
-	LookbackSeconds int    `json:"lookback_seconds"`
+	Host             string `json:"host"`
+	Port             int    `json:"port"`
+	HTTPS            bool   `json:"https"`
+	ClientCert       string `json:"client_cert"`
+	ClientKey        string `json:"client_key"`
+	Unit             string `json:"unit"`
+	MinPriority      *int   `json:"min_priority"`
+	LookbackSeconds  int    `json:"lookback_seconds"`
+	ParseJSONMessage bool   `json:"parse_json_message"`
 }
 
 // ndjsonLine is deliberately independent of internal/contract's types — an adapter is any
@@ -92,7 +94,7 @@ func main() {
 	defer writer.Flush()
 	encoder := json.NewEncoder(writer)
 	for _, entry := range filterEntries(entries, minPriority) {
-		if err := encoder.Encode(toNDJSON(entry)); err != nil {
+		if err := encoder.Encode(toNDJSON(entry, cfg.ParseJSONMessage)); err != nil {
 			log.Fatalf("journal-http: encode line: %v", err)
 		}
 	}
@@ -218,8 +220,10 @@ func filterEntries(entries []journalEntry, minPriority int) []journalEntry {
 
 // toNDJSON converts a parsed journalEntry into the wire event line: "warn" for priority <= 4
 // (crit/alert/emerg/err), "info" otherwise (warning/notice/info/debug) — mirrors syslog severity
-// convention (lower number = more severe).
-func toNDJSON(entry journalEntry) ndjsonLine {
+// convention (lower number = more severe). When parseJSONMessage is enabled, decorateJSONMessage
+// may add extra labels and swap in a friendlier Message (docs/SPEC.md's generic structured-log
+// support — opt-in, no assumption about which application emitted the log or its field names).
+func toNDJSON(entry journalEntry, parseJSONMessage bool) ndjsonLine {
 	level := "info"
 	if priority, err := strconv.Atoi(entry.Priority); err == nil && priority <= 4 {
 		level = "warn"
@@ -235,12 +239,50 @@ func toNDJSON(entry journalEntry) ndjsonLine {
 		ts = time.UnixMicro(usec).UTC()
 	}
 
+	message := entry.Message
+	labels := map[string]string{"unit": unit, "priority": entry.Priority}
+	if parseJSONMessage {
+		message = decorateJSONMessage(entry.Message, labels)
+	}
+
 	return ndjsonLine{
 		Type:      "event",
 		SourceID:  "journal-http",
 		Timestamp: ts.Format(time.RFC3339),
 		Level:     level,
-		Message:   entry.Message,
-		Labels:    map[string]string{"unit": unit, "priority": entry.Priority},
+		Message:   message,
+		Labels:    labels,
 	}
+}
+
+// decorateJSONMessage attempts to JSON-decode rawMessage as an object. On success, every top-level
+// scalar (string/number/bool) field is added to labels (stringified via fmt.Sprint; nested
+// objects/arrays are skipped — flat labels only), and a conventional "message"/"msg" key (checked
+// case-insensitively), if present, is returned as the friendlier display text in place of the raw
+// JSON blob. This is deliberately generic: it doesn't assume any particular application's log
+// schema (field names, "kind"/"route"/whatever) — it just surfaces whatever structured fields a
+// JSON log line happens to carry. Non-JSON or non-object messages are returned unchanged, so
+// disabling parse_json_message (the default) reproduces today's exact behavior, and enabling it
+// against a source whose logs aren't JSON is a silent no-op rather than an error.
+func decorateJSONMessage(rawMessage string, labels map[string]string) string {
+	var fields map[string]any
+	if err := json.Unmarshal([]byte(rawMessage), &fields); err != nil {
+		return rawMessage
+	}
+
+	message := rawMessage
+	for key, value := range fields {
+		switch v := value.(type) {
+		case string:
+			labels[key] = v
+			if message == rawMessage && (strings.EqualFold(key, "message") || strings.EqualFold(key, "msg")) {
+				message = v
+			}
+		case float64, bool:
+			labels[key] = fmt.Sprint(v)
+		default:
+			// nested object/array — skipped, labels stay flat
+		}
+	}
+	return message
 }

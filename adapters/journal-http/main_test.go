@@ -95,7 +95,7 @@ func TestFilterByLookback(t *testing.T) {
 
 func TestToNDJSON(t *testing.T) {
 	t.Run("high severity maps to warn", func(t *testing.T) {
-		line := toNDJSON(journalEntry{Message: "boom", Priority: "3", SystemdUnit: "nginx.service", RealtimeTimestamp: "1705318800000000"})
+		line := toNDJSON(journalEntry{Message: "boom", Priority: "3", SystemdUnit: "nginx.service", RealtimeTimestamp: "1705318800000000"}, false)
 		if line.Type != "event" || line.Level != "warn" {
 			t.Fatalf("got %+v", line)
 		}
@@ -109,16 +109,60 @@ func TestToNDJSON(t *testing.T) {
 	})
 
 	t.Run("low severity maps to info", func(t *testing.T) {
-		line := toNDJSON(journalEntry{Message: "ok", Priority: "6", SystemdUnit: "sre-kit.service"})
+		line := toNDJSON(journalEntry{Message: "ok", Priority: "6", SystemdUnit: "sre-kit.service"}, false)
 		if line.Level != "info" {
 			t.Fatalf("got %+v", line)
 		}
 	})
 
 	t.Run("falls back to syslog identifier when unit is unset", func(t *testing.T) {
-		line := toNDJSON(journalEntry{Message: "cron ran", Priority: "6", SyslogIdentifier: "cron"})
+		line := toNDJSON(journalEntry{Message: "cron ran", Priority: "6", SyslogIdentifier: "cron"}, false)
 		if line.Labels["unit"] != "cron" {
 			t.Fatalf("got labels %+v", line.Labels)
+		}
+	})
+
+	t.Run("parse_json_message disabled leaves a JSON-looking message untouched", func(t *testing.T) {
+		line := toNDJSON(journalEntry{Message: `{"kind":"client_error","route":"/checkout"}`, Priority: "6"}, false)
+		if line.Message != `{"kind":"client_error","route":"/checkout"}` {
+			t.Fatalf("got message %q", line.Message)
+		}
+		if _, ok := line.Labels["kind"]; ok {
+			t.Fatal("did not expect JSON fields to be flattened into labels when disabled")
+		}
+	})
+
+	t.Run("parse_json_message enabled flattens fields and prefers message key", func(t *testing.T) {
+		line := toNDJSON(journalEntry{
+			Message:     `{"kind":"client_error","route":"/checkout","retries":3,"fatal":true,"message":"payment failed"}`,
+			Priority:    "6",
+			SystemdUnit: "web.service",
+		}, true)
+		if line.Message != "payment failed" {
+			t.Fatalf("got message %q, want the JSON's message field", line.Message)
+		}
+		if line.Labels["kind"] != "client_error" || line.Labels["route"] != "/checkout" {
+			t.Fatalf("got labels %+v", line.Labels)
+		}
+		if line.Labels["retries"] != "3" || line.Labels["fatal"] != "true" {
+			t.Fatalf("expected numeric/bool fields stringified, got %+v", line.Labels)
+		}
+		if line.Labels["unit"] != "web.service" {
+			t.Fatalf("expected the usual unit/priority labels to survive, got %+v", line.Labels)
+		}
+	})
+
+	t.Run("parse_json_message enabled on a non-JSON message is a no-op", func(t *testing.T) {
+		line := toNDJSON(journalEntry{Message: "plain text log line", Priority: "6"}, true)
+		if line.Message != "plain text log line" {
+			t.Fatalf("got message %q", line.Message)
+		}
+	})
+
+	t.Run("parse_json_message enabled on a JSON array leaves message untouched", func(t *testing.T) {
+		line := toNDJSON(journalEntry{Message: `[1,2,3]`, Priority: "6"}, true)
+		if line.Message != `[1,2,3]` {
+			t.Fatalf("got message %q", line.Message)
 		}
 	})
 }

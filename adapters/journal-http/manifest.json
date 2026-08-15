@@ -36,6 +36,11 @@
         "default": 120,
         "minimum": 1,
         "description": "How far back each poll looks for journal entries, applied client-side against the last 2000 fetched entries."
+      },
+      "parse_json_message": {
+        "type": "boolean",
+        "default": false,
+        "description": "When true, attempts to JSON-decode each entry's MESSAGE field. If it decodes to an object, its top-level scalar fields are flattened into the event's labels, and a \"message\"/\"msg\" field (if present) becomes the displayed message instead of the raw JSON. Generic structured-log support — no assumption about which application emitted the log or its field names. Non-JSON messages are unaffected; disabled (default) reproduces the adapter's original behavior exactly."
       }
     },
     "required": ["host"],

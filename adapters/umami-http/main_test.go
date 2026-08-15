@@ -168,6 +168,55 @@ func TestFetchStats_NonOKStatus(t *testing.T) {
 	}
 }
 
+func TestFetchEventCount_Success(t *testing.T) {
+	var gotQuery string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		if r.Header.Get("Authorization") != "Bearer tok" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		fmt.Fprint(w, `{"data":[],"count":7,"page":1}`)
+	}))
+	defer server.Close()
+
+	count, err := fetchEventCount(&http.Client{}, config{BaseURL: server.URL, WebsiteID: "site1"}, "tok", "signup", time.UnixMilli(1000), time.UnixMilli(2000))
+	if err != nil {
+		t.Fatalf("fetchEventCount: %v", err)
+	}
+	if count != 7 {
+		t.Fatalf("count = %v, want 7", count)
+	}
+	if !strings.Contains(gotQuery, "event=signup") {
+		t.Fatalf("got query %q, want event=signup", gotQuery)
+	}
+}
+
+func TestFetchEventCount_NonOKStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	if _, err := fetchEventCount(&http.Client{}, config{BaseURL: server.URL, WebsiteID: "site1"}, "tok", "signup", time.Now(), time.Now()); err == nil {
+		t.Fatal("expected an error for a non-2xx response")
+	}
+}
+
+func TestEventCountNDJSON(t *testing.T) {
+	ts := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	line := eventCountNDJSON("signup", 7, ts)
+	if line.Type != "metric" || line.SourceID != "umami-http" || line.Name != "analytics.event_count" {
+		t.Fatalf("unexpected envelope: %+v", line)
+	}
+	if line.Value != 7 {
+		t.Fatalf("value = %v, want 7", line.Value)
+	}
+	if line.Labels["event"] != "signup" {
+		t.Fatalf("labels = %+v, want event=signup", line.Labels)
+	}
+}
+
 func TestFetchStats_AllZeroTrafficIsNotAnError(t *testing.T) {
 	fake := &fakeUmami{
 		wantUsername: "admin", wantPassword: "s3cret", wantWebsiteID: "site1", token: "tok",
