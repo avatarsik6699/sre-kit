@@ -60,6 +60,14 @@ Success metrics for v1:
 | Pagination / retention policy tooling beyond simple TTL deletion | Downsampling / rollup usage (schema reserved, not active) |
 | `Host` entity + observability auto-provisioning (Beszel, Umami presets) — added post-M6, see §12 | Multi-tool bundle presets, fleet auto-onboarding / agent-push model, non-Linux / non-SSH / non-Docker provisioning targets (PaaS, Kubernetes, bare-metal without SSH, Windows) — see §12.5 |
 
+**First-party reference deployment.** `infraegev2` is a sibling repository owned by the same
+architect, not an external customer integration. `sre-kit` owns the observability core, adapters,
+source configuration, presets and deployment automation for observability components. infraegev2
+owns application telemetry emission, its VPS access and network prerequisites, and its application
+Compose topology until a coordinated change explicitly moves a component. Any task that changes
+both sides must have linked active Backlog items in both repositories; the removed infraegev2
+`apps/ops` dashboard is not restored as a second observability product.
+
 ---
 
 ## 2. Domain Context
@@ -409,6 +417,12 @@ static binary, `x/crypto/ssh`), SQLite storage, React + TanStack Start + Mantine
 NDJSON-over-stdio adapter protocol (language-agnostic, easy to debug by hand:
 `echo config | ./adapter`).
 
+The first-party infraegev2 installation is the reference dogfood target for this infrastructure.
+Reusable collectors and observability deployment logic belong here; application-specific
+instrumentation, public routing and VPS prerequisites stay in infraegev2. A live-only source or
+deployment adjustment is incomplete until the owning repository contract is updated through its
+SDD workflow.
+
 **Architectural style**: the Go backend follows a modular DDD-like layout (bounded-context
 packages under `internal/`, each split into `domain`/`application`/`infrastructure`/`interfaces`,
 communicating across module boundaries through ports rather than direct imports); the React
@@ -600,6 +614,10 @@ Named explicitly here, the same way TOFU is named in §10/§11, not silently shi
 
 The design targets exactly "one SSH-reachable Linux host with Docker" as the deploy unit. Already
 covered with zero changes: stack co-located with the monitored app, or on a separate VPS (§12.1).
+The current infraegev2 deployment is a first-party co-located instance, but its existing Beszel and
+Umami services remain application-Compose-owned until a separate coordinated migration proves
+state preservation, rollback and source continuity. This ownership rule does not by itself trigger
+that migration.
 Partially covered, explicitly deferred (§10): a shared stack auto-onboarding multiple additional
 monitored hosts — would eventually need an agent-push model instead of pure SSH-pull provisioning,
 not built in v1. Out of shape for this mechanism entirely, not a gap to close later (§10): PaaS /

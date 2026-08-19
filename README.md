@@ -48,6 +48,15 @@ Each adapter is an independent process: given resolved config on stdin, it emits
 (`metric` / `check` / `event`) on stdout and exits non-zero on failure to reach its target — that's
 the entire contract. Writing a new source means writing a new adapter, not touching the core.
 
+### Relationship with infraegev2
+
+[`infraegev2`](https://github.com/avatarsik6699/infraegev2) is this project's first-party reference
+deployment, not an unrelated external consumer. sre-kit owns the observability core, adapters,
+source configuration, presets and observability deployment automation. infraegev2 owns its
+application telemetry, VPS/network prerequisites and application Compose stack. Work crossing that
+boundary is tracked by coordinated SDD changes in both repositories; the retired infraegev2
+`apps/ops` dashboard is not a competing implementation.
+
 See [`docs/SPEC.md`](docs/SPEC.md) for the full technical specification (data model, API
 contract, auth model, roadmap) and [`docs/STACK.md`](docs/STACK.md) for concrete stack details,
 module layout, and conventions.

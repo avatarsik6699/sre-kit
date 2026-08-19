@@ -20,7 +20,7 @@
 | Backend | Go 1.2x (`x/crypto/ssh` for SSH-based collectors) |
 | Database | SQLite (`modernc.org/sqlite` or `mattn`) |
 | Cache | — (no separate cache layer; batched direct writes to SQLite) |
-| Infra | Single Docker container (or a plain binary + systemd) |
+| Infra | Single Docker container (or a plain binary + systemd); first-party reference deployment is the sibling `infraegev2` project, coordinated through active changes in both repositories |
 | Package managers | Go modules (backend), `pnpm` (frontend) |
 | CI | — (not yet configured) |
 
