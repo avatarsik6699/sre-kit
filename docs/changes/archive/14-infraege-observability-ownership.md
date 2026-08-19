@@ -7,7 +7,7 @@
 | Change | `14` |
 | Slug | `infraege-observability-ownership` |
 | Title | infraege Observability Ownership |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/14-infraege-observability-ownership` |
 
 ---
