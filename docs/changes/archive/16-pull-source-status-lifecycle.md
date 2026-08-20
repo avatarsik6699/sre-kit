@@ -7,7 +7,7 @@
 | Change | `16` |
 | Slug | `pull-source-status-lifecycle` |
 | Title | Pull Source Status Lifecycle |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/16-pull-source-status-lifecycle` |
 
 ---

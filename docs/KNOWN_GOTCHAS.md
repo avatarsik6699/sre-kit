@@ -21,7 +21,9 @@
 - **Fix**: create coordinated active Backlog items in both repositories. Keep adapters,
   normalization, alerts and monitoring UI in sre-kit; keep target installation, credentials,
   Compose/systemd lifecycle and backup/restore in infraegev2 `ops/`. Integrate only through
-  versioned Source registration and Metric/Check/Event ingestion contracts.
+  Source registration and Metric/Check/Event ingestion contracts. Current pair: sre-kit Change 19
+  and infraegev2 Change 44; neither may claim six-Source live proof until registration, polling and
+  dashboard evidence exist.
 
 ### Retired provisioning tables are intentionally inert
 
@@ -68,9 +70,10 @@
   will happily connect to a spoofed host (MITM) with no warning.
 - **Root cause**: v1 has no `known_hosts` store or first-connection TOFU (trust-on-first-use)
   pinning mechanism; building one was out of scope for `M2` (docs/changes/02-host-metrics-ssh-adapter.md).
-- **Fix**: none yet — acceptable for a solo-developer/small-team SSH-to-own-VPS use case in v1,
-  but revisit before `M6` dogfooding widens exposure (e.g. persist the host key fingerprint on
-  first successful connect, alongside the source's config, and fail loudly on mismatch after).
+- **Fix**: none yet — accepted for the current first-party dogfood, but do not describe the adapter
+  connection as pinned merely because infraegev2's administrative SSH wrapper is pinned. Revisit
+  before shared/team use, third-party adapters or an always-on M11 deployment (e.g. persist the
+  host key fingerprint on first successful connect and fail loudly on mismatch after).
 - **Prevention**: n/a until a TOFU/pinning implementation exists.
 
 ### Pull-adapter outcome reporting must not depend on emitted telemetry

@@ -9,7 +9,7 @@
 | Change | `12` |
 | Slug | `observability-auto-provisioning` |
 | Title | Observability Auto-Provisioning |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/12-observability-auto-provisioning` |
 
 ---
@@ -118,7 +118,7 @@ list above. Do not hand-copy schema/endpoint/type details into this file.
 ## Gate Checks
 
 > Fast Gate runs per task in `/work`; Full Gate and (with `--release`) Release Gate run once in
-> `/ship`. Both are defined in [docs/STACK.md](./STACK.md) — this section only records
+> `/ship`. Both are defined in [docs/STACK.md](../../STACK.md) — this section only records
 > change-specific overrides.
 
 None.

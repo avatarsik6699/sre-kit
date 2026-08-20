@@ -9,7 +9,7 @@
 | Change | `13` |
 | Slug | `generic-event-counts-and-json-logs` |
 | Title | Generic Event Counts and Structured-Log Parsing |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/13-generic-event-counts-and-json-logs` |
 
 ---

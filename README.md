@@ -30,8 +30,8 @@ Telegram.
 - **Alert router** — rule-based evaluation over Metric/Check/Event with a full firing → resolved
   lifecycle, delivered to Telegram.
 - **Small self-hosted core** — Go API, SQLite storage, independently built web UI and first-party
-  adapter subprocesses. A unified release artifact is planned for M11; current Docker packaging
-  contains the API and adapters only.
+  adapter subprocesses. Six production adapters are included in the API/adapters Docker image; a
+  unified API+web release artifact remains M11.
 
 ## Architecture at a glance
 
@@ -57,6 +57,16 @@ normalization, alerting and the monitoring UI. infraegev2 owns installation, con
 backup/restore and rollback of observability tools on its VPS. The repositories communicate only
 through versioned Source registration and telemetry ingestion contracts.
 
+The live infraegev2 target uses an independent `infraege-ops` Compose project. Its secret-free
+template defines six intended Sources: uptime, root/password SSH host metrics and fail2ban,
+WireGuard journal gateway, Beszel and Umami. Config shapes match the current manifests. A read-only
+2026-08-20 local DB audit found only five older records: uptime absent, both SSH Sources never seen
+and `unreachable`, and the other three last seen on 2026-08-15. This is stale pre-cutover state,
+not live proof; Change 19 records the gap and a following runtime change must reconcile and verify
+registration, polling and dashboard evidence. The
+root/password choice is an accepted target policy; sre-kit consumes it as Source input and does
+not own VPS access hardening or migration.
+
 See [`docs/SPEC.md`](docs/SPEC.md) for the full technical specification (data model, API
 contract, auth model, roadmap) and [`docs/STACK.md`](docs/STACK.md) for concrete stack details,
 module layout, and conventions.
@@ -76,10 +86,15 @@ git clone git@github.com:avatarsik6699/sre-kit.git
 cd sre-kit
 
 cp .env.example .env
-# generate a secrets-store encryption key and set SRE_KIT_SECRETS_KEY in .env
-openssl rand -hex 32
+# Generate a secrets-store encryption key and write it to SRE_KIT_SECRETS_KEY in .env.
+sre_kit_secrets_key=$(openssl rand -hex 32)
+sed -i "s/^SRE_KIT_SECRETS_KEY=.*/SRE_KIT_SECRETS_KEY=$sre_kit_secrets_key/" .env
+unset sre_kit_secrets_key
 
 go mod download
+set -a
+. ./.env
+set +a
 go run ./cmd/server
 ```
 
@@ -89,9 +104,8 @@ and served separately during development; a single packaged distribution is an M
 For frontend development with hot reload:
 
 ```bash
-cd web
-pnpm install
-pnpm dev
+pnpm --dir web install --frozen-lockfile
+pnpm --dir web dev
 ```
 
 ### Run the API and adapters with Docker
@@ -109,9 +123,10 @@ above until the M11 distribution work defines the combined artifact.
 
 ### Adding a source
 
-Once the server is running, add a source (e.g. `host-metrics-ssh`) through the UI with the
-target host's SSH credentials — no manual exporter setup or agent install required on the
-monitored host. See `docs/SPEC.md` §3/§6 for the config and secrets model.
+Once the server is running, add a source through the UI. The form validates the manifest-backed
+configuration before saving; its current “Test connection” action does not probe the target
+because no dedicated endpoint exists. SSH adapters need target credentials but no exporter or
+agent installation. See `docs/SPEC.md` §3/§6 for the config and secrets model.
 
 ## Writing a new adapter
 
@@ -130,8 +145,10 @@ reference implementations, and each adapter's `manifest.json` for the config-sch
 
 ## Project status
 
-v1 (MVP) is feature-complete: unified contract, three SSH/HTTP-based adapters, live dashboard,
-and Telegram alerting. See [`docs/SPEC.md`](docs/SPEC.md) §9 for the roadmap and
+The core v1 feature set is implemented: unified contract, six production pull adapters, live
+dashboard and Telegram alerting. End-to-end dogfood is not complete until infraegev2's stale local
+Source set is reconciled to the six current target configurations and observed. Generic push ingress, adapter extensibility hardening and a combined
+deployable distribution remain later milestones. See [`docs/SPEC.md`](docs/SPEC.md) §9 for the roadmap and
 [`docs/changes/archive/`](docs/changes/archive/) for the history of how each piece was built.
 
 ## Development workflow

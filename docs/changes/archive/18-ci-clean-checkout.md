@@ -7,7 +7,7 @@
 | Change | `18` |
 | Slug | `ci-clean-checkout` |
 | Title | CI Clean Checkout Reproducibility |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/18-ci-clean-checkout` |
 
 ---

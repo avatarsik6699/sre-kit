@@ -7,7 +7,7 @@
 | Change | `04` |
 | Slug | `minimal-ui` |
 | Title | Minimal UI |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/04-minimal-ui` |
 
 ---
@@ -108,7 +108,7 @@ Files list above. Do not hand-copy schema, endpoint, or type details into this f
 ## Gate Checks
 
 > Fast Gate runs per task in `/work`; Full Gate and (with `--release`) Release Gate run once in
-> `/ship`. Both are defined in [docs/STACK.md](./STACK.md) — this section only records
+> `/ship`. Both are defined in [docs/STACK.md](../../STACK.md) — this section only records
 > change-specific overrides.
 
 None.

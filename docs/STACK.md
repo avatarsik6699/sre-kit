@@ -16,12 +16,12 @@
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React + TanStack Start + Mantine UI v9+ (`@mantine/charts` for time-series/live charts); TanStack Query drives cache invalidation over the WS stream |
-| Backend | Go 1.2x (`x/crypto/ssh` for SSH-based collectors) |
+| Frontend | React **19.2.8**, TanStack Start **1.168.44**, Mantine **9.5.1** exact (`@mantine/charts` for time-series/live charts), Vite **8.2.1** and TanStack Query **5.101.4** over the WS stream |
+| Backend | Go **1.26.5** (`x/crypto/ssh` for SSH-based collectors) |
 | Database | SQLite (`modernc.org/sqlite` or `mattn`) |
 | Cache | — (no separate cache layer; batched direct writes to SQLite) |
 | Infra | Current Docker image contains the Go API and adapters; web is built separately. Combined local/management-VPS distribution is deferred to M11. `infraegev2` is the first dogfood integration and owns its own target automation |
-| Package managers | Go modules (backend), `pnpm` (frontend) |
+| Package managers | Go modules (backend), pnpm **10.33.0** / Node.js **24** (frontend and CI) |
 | CI | GitHub Actions (`.github/workflows/ci.yml`) on pull requests and pushes to `main` |
 
 ---
@@ -29,10 +29,10 @@
 ## Prerequisites
 
 ```bash
-# Examples — replace with the actual versions this project requires
-# go version
-# node --version
-# pnpm --version
+go version       # 1.26.5 from go.mod
+node --version   # 24.x
+pnpm --version   # exactly 10.33.0
+docker --version # optional API/adapters image
 ```
 
 ---
@@ -40,10 +40,18 @@
 ## Initial setup
 
 ```bash
-# How a developer brings the stack up the first time.
-# go mod tidy
-# pnpm install && pnpm dev
+cp .env.example .env
+# Set SRE_KIT_SECRETS_KEY in .env without committing it.
+go mod download
+pnpm --dir web install --frozen-lockfile
+set -a
+. ./.env
+set +a
 ```
+
+Run the API with the required environment loaded (`go run ./cmd/server`) and the web development
+server separately (`pnpm --dir web dev`). The current Docker image packages the API and all six
+production adapters but not the web build; the combined distribution remains M11.
 
 ---
 
@@ -124,7 +132,7 @@ tool that isn't available must be reported as skipped with a reason, never silen
 | Domain | Required tool/skill | When | Available in this project |
 |--------|----------------------|------|-----------------------------|
 | Frontend UI change | Playwright MCP / chrome-devtools MCP (screenshot + console check) | after implementing, before checking off | `yes` (Playwright MCP) |
-| TypeScript / Python change | LSP diagnostics | after implementing, before checking off | `no — recommend adding gopls for Go; TS LSP status unconfirmed` |
+| TypeScript / Go change | LSP diagnostics | after implementing, before checking off | TypeScript LSP available; Go `gopls` not configured, so Go relies on `go vet`/tests and must report LSP as skipped |
 | New/changed API surface | `openapi-typescript` (or equivalent) regen + frontend re-typecheck | after backend contract change | `yes` — `swag` annotations + `node scripts/api-contracts.mjs` (see § API contract generation) |
 | Architecture-level decision | architecture skill | during planning | `no` |
 | Frontend design decision | `frontend-design` skill | during `/plan` §5.3 and design Backlog items | `no` |
@@ -146,8 +154,8 @@ go test ./...
 ### Frontend (if applicable)
 
 ```bash
-pnpm tsc --noEmit
-pnpm vitest run
+pnpm --dir web typecheck
+pnpm --dir web test
 ```
 
 ---
@@ -194,8 +202,7 @@ internal/platform/config/config.go          # typed settings from env
 internal/platform/db/sqlite.go              # connection + migration runner
 internal/platform/db/migrations/0001_init.sql
                                              # sources, metrics, checks, events, alerts,
-                                             # alert_rules (tables only — no Go module reads/writes
-                                             # alerts/alert_rules until M5), metrics_rollup (reserved)
+                                             # alert_rules and reserved metrics_rollup
 internal/platform/secrets/secrets.go        # secrets.enc.json read/write — shared kernel used by
                                              # sources.secret_ref and auth's password hash
 internal/platform/httpserver/server.go      # HTTP server bootstrap + router mount
@@ -218,6 +225,13 @@ internal/telemetry/
   infrastructure/sqlite_repo.go
   interfaces/http/handlers.go      # /api/metrics, /api/checks, /api/events
 
+internal/alertrouter/
+  domain/                           # Alert lifecycle and rule evaluation
+  application/                      # rules/channels/alerts use-cases and notification ports
+  infrastructure/sqlite_repo.go
+  interfaces/http/handlers.go      # /api/alerts, /api/alert-rules,
+                                    # /api/notification-channels
+
 internal/adapterengine/       # named to avoid colliding with the top-level adapters/ dir
                                # (external subprocess adapter binaries)
   domain/manifest.go          # Manifest, Mode(pull|stream) + validation
@@ -237,8 +251,10 @@ internal/auth/
   interfaces/http/handlers.go   # /api/auth/login
   interfaces/http/middleware.go # session-required middleware, mounted in platform/httpserver
 
-adapters/stub/main.go, manifest.json   # external stub adapter binary, different namespace from
-                                        # internal/adapterengine on purpose
+internal/platform/wshub/        # authenticated /api/stream fan-out for telemetry and alerts
+
+adapters/{host-metrics-ssh,uptime-http,fail2ban-ssh,journal-http,beszel-api,umami-http}/
+                                      # six production pull adapters plus adapters/stub for tests
 ```
 
 **Cross-module dependencies use ports, not direct imports.** When one bounded context needs
@@ -259,9 +275,10 @@ under Fast Gate's `go test ./... -short`; anything touching `infrastructure`/`in
 SQLite, real HTTP) is gated behind `testing.Short()` so it only runs in Full Gate's plain
 `go test ./...`.
 
-**Deferred, not yet built**: `internal/alerts` (full domain/CRUD/router — targeted for M5, once
-the Alert router itself is designed); `internal/platform/wshub` and the `/api/stream` WS handler
-(targeted for M4, when the live dashboard needs it).
+**Deferred, not yet wired**: `Supervisor` has focused stream-mode tests, but the composition root
+schedules pull adapters only because no stream adapter exists. Generic push ingress/webhooks are
+an M9 contract and are not present in the generated HTTP API. The combined API+web distribution
+and its deployment/backup lifecycle remain M11.
 
 ### API contract generation
 
@@ -279,10 +296,10 @@ node scripts/api-contracts.mjs --check  # generate into a temp dir, diff against
                                          # ./...` (running swag)
 ```
 
-**This is a different contract from `contract.schema.json`** (above — the NDJSON adapter data
+**This is a different contract from `internal/contract/contract.schema.json`** (above — the NDJSON adapter data
 contract for Metric/Check/Event/Alert). Same word, two unrelated schemas, deliberately named and
-located differently (`contract.schema.json` at repo root vs. `contracts/openapi.json` in a
-subdirectory) so they're never confused: one describes what adapters emit over stdio, the other
+located differently (`internal/contract/contract.schema.json` vs. `contracts/openapi.json`) so
+they're never confused: one describes what adapters emit over stdio, the other
 describes the HTTP/WS surface the frontend consumes.
 
 ---
@@ -321,11 +338,8 @@ web/
         ├── config/           # client-env.ts (one place reading import.meta.env),
         │                     # mantine-theme.ts (owns theme/defaults — see docs/SPEC.md §5.3
         │                     # for the actual palette/typography tokens it's populated with)
-        ├── lib/               # safe-ls.ts, safe-json.ts, query-client.ts (retry: false —
-        │                     # matches SPEC §5.2's WS-push cache model), client-errors/
-        │                     # (capture/fingerprint/dedupe; submit sink stubbed, no backend
-        │                     # endpoint yet); the /api/stream WebSocket wrapper lives here
-        │                     # once M4 needs it
+        ├── lib/               # safe-ls.ts, safe-json.ts, query-client.ts, client-errors/ and
+        │                     # the active ws-stream-store/use-stream-subscription boundary
         └── styles/
 ```
 
@@ -364,25 +378,30 @@ Conventions, ported near-verbatim from the reference:
   alias (mirrored in `vite.config.ts` and `vitest.config.ts`).
 - **Vite**: `@tanstack/react-start/plugin/vite` + `@vitejs/plugin-react`, `resolve:
   { tsconfigPaths: true }`.
-- **Testing config**: `web/tests/render.tsx` is the themed Vitest render helper (wraps units in
-  the production Mantine theme). `web/e2e/fixtures.ts` + `web/e2e/pages/*.page.ts` hold the
-  Playwright fixture/Page-Object scaffolding per `docs/FRONTEND_CONVENTIONS.md` § 9 — no specs
-  exist until real pages land at M4.
+- **Testing config**: `web/tests/render.tsx` is the themed Vitest render helper. Unit tests cover
+  shared adapters and UI utilities. `web/e2e/fixtures.ts` plus an empty Page Object directory are
+  scaffolding only; there are no Playwright specs yet.
 
 ---
 
 ## Common operations
 
 ```bash
-# Start the stack
-# [command]
+# API (load the protected .env in the shell first)
+go run ./cmd/server
 
-# Stop everything
-# [command]
+# Frontend development
+pnpm --dir web dev
 
-# Add a new migration / schema change
-# [command]
+# API/adapters-only container
+docker build -t sre-kit .
 
-# Format / lint
-# [command]
+# Fast quality checks
+test -z "$(find cmd internal adapters -type f -name '*.go' -print0 | xargs -0 gofmt -l)"
+go vet ./...
+go test ./... -short
+pnpm --dir web lint
+pnpm --dir web typecheck
+
+# Migrations are forward-only embedded SQL under internal/platform/db/migrations/.
 ```

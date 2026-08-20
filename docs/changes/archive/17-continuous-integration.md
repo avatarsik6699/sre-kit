@@ -7,7 +7,7 @@
 | Change | `17` |
 | Slug | `continuous-integration` |
 | Title | Continuous Integration |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/17-continuous-integration` |
 
 ---

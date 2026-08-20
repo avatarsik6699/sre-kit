@@ -55,15 +55,15 @@ backup of monitored tools belong to each target application's operations layer, 
 | Unified data contract: Metric, Check, Event, Alert | Remote actions, deployment, rollback or configuration mutation |
 | `host-metrics-ssh` adapter (CPU/RAM/disk/network via SSH) | Docker container adapter |
 | `uptime-http` adapter (HTTP/TCP check + TLS expiry) | Backup / dead-man-switch adapter |
-| `fail2ban-ssh` adapter (optional, time-permitting) | |
+| `fail2ban-ssh` adapter | |
 | `journal-http` adapter (systemd-journal-gatewayd) | |
 | `beszel-api` adapter (host + per-container metrics via PocketBase) | |
 | `umami-http` adapter (web analytics, Umami-style) — added post-M6, contract proven on 5 prior adapters (§10) | |
 | Live dashboard via WebSocket push (Sources, Dashboard, Source detail) | Multi-user / RBAC / audit log |
 | Alert rules with single Telegram notification channel | Escalation / repeat notifications on unresolved alerts |
 | Single admin-password auth | OAuth / full user management |
-| Pagination / retention policy tooling beyond simple TTL deletion | Downsampling / rollup usage (schema reserved, not active) |
-| Adapter-driven pull/stream inputs; generic authenticated push input is the next extension (§9) | Tool installers, Docker Compose presets and target-host credential management |
+| Current runtime executes pull adapters; stream supervisor is implemented and tested but not wired because no stream adapter exists | Downsampling / rollup usage (schema reserved, not active) |
+| Generic authenticated push input is the next extension (§9) | Tool installers, Docker Compose presets and target-host credential management |
 
 **First-party reference deployment.** `infraegev2` is a sibling repository owned by the same
 architect, not an external customer integration. `sre-kit` owns the observability core, adapter
@@ -71,6 +71,9 @@ contracts, source configuration, normalization, alerting and monitoring UI. infr
 application telemetry plus the installation and lifecycle of observability components on its VPS.
 The two repositories integrate only through versioned source-registration and telemetry-ingestion
 contracts. Neither repository imports the other's internal code or assumes its filesystem layout.
+For the current infraegev2 target, password-only `root` is an explicitly accepted administration
+and SSH-adapter input. sre-kit stores the credential only in its encrypted Source secret store and
+does not own, schedule or recommend changes to that target access policy.
 
 ---
 
@@ -108,9 +111,9 @@ authorization to mutate the target.
 
 ## 3. Data Model
 
-SQLite. Draft schema below is authoritative for v1; migrations happen through explicit schema
-changes tracked in `docs/changes/*.md` Files sections, not a separate ORM-managed history unless
-one is adopted later.
+SQLite. The schema below summarizes the active migrations under
+`internal/platform/db/migrations/`; those embedded forward migrations, not this prose copy, are the
+executable source of truth.
 
 ```sql
 CREATE TABLE sources (
@@ -199,9 +202,9 @@ Secrets (SSH keys, third-party API tokens) are **not** stored in SQLite. They li
 never the secret value itself — this lets the main DB be freely backed up/copied without leaking
 credentials.
 
-Retention: v1 uses a configurable TTL on `metrics`/`events` (default 30 days), purged by a daily
-background job. `metrics_rollup` is reserved in the schema now so a v2 downsampling feature doesn't
-require a migration, but it is not written to or read from in v1.
+Automated TTL retention is not implemented. `metrics_rollup` is reserved in the schema so a later
+downsampling feature does not require its first table migration, but current code neither writes
+nor reads it. Retention policy/tooling must be designed before long-running distribution work.
 
 ---
 
@@ -219,41 +222,43 @@ additive-only otherwise) defines the four wire entities adapters emit as NDJSON:
 Every adapter is an independent subprocess (any language) declaring a `manifest.json`
 (`name`, `version`, `mode: pull|stream`, `emits`, `config_schema`, and for `stream` mode,
 `heartbeat_seconds`). The core's Adapter runner validates every NDJSON line against
-`contract.schema.json` before writing to storage; invalid lines are logged to a per-source error
-log, and 10 consecutive invalid lines (default) auto-disables the source and raises an
+`contract.schema.json` before writing to storage; invalid lines are logged with the Source id,
+and 10 consecutive invalid lines (default) auto-disables the source and raises an
 "adapter misbehaving" Alert.
 
 **HTTP/WS API surface:**
 
 | Verb / Method | Path | Auth | Payload / Response |
 |---------------|------|------|---------------------|
+| GET | `/healthz` | none | empty 200 readiness/liveness response |
 | GET | `/api/sources` | session | list of sources + current status |
 | POST | `/api/sources` | session | `{adapter_id, config}` → created source |
-| PATCH | `/api/sources/:id` | session | enable/disable/update config |
-| DELETE | `/api/sources/:id` | session | remove source |
+| PATCH | `/api/sources/{id}` | session | enable/disable/update config |
+| DELETE | `/api/sources/{id}` | session | remove source |
 | GET | `/api/metrics?source=&name=&from=&to=` | session | time-series slice |
 | GET | `/api/checks?source=` | session | current statuses |
 | GET | `/api/events?source=&limit=` | session | event feed |
 | GET | `/api/alerts?status=` | session | active/resolved alerts |
 | GET | `/api/alert-rules?source=` | session | list of alert rules |
 | POST | `/api/alert-rules` | session | `{source_id, target_name, condition, threshold, debounce_seconds, notify_channel_id}` |
-| PATCH | `/api/alert-rules/:id` | session | update/enable/disable a rule |
-| DELETE | `/api/alert-rules/:id` | session | remove a rule |
+| PATCH | `/api/alert-rules/{id}` | session | update/enable/disable a rule |
+| DELETE | `/api/alert-rules/{id}` | session | remove a rule |
 | GET | `/api/notification-channels` | session | list of configured channels (never returns `secret_ref` value) |
 | POST | `/api/notification-channels` | session | `{type: "telegram", config: {chat_id}, bot_token}` → stores `bot_token` via the §3 secrets mechanism, returns channel with `secret_ref` |
-| PATCH | `/api/notification-channels/:id` | session | update config / enable / disable / rotate token |
-| DELETE | `/api/notification-channels/:id` | session | remove a channel (blocked if an enabled `alert_rules` row still references it) |
+| PATCH | `/api/notification-channels/{id}` | session | update config / enable / disable / rotate token |
+| DELETE | `/api/notification-channels/{id}` | session | remove a channel (blocked if an enabled `alert_rules` row still references it) |
 | POST | `/api/auth/login` | none (this *is* the login) | admin password → session cookie |
-| POST | `/api/webhooks/:source_id` | source-scoped token | push-mode adapter data (dead-man-switch style) |
 | WS | `/api/stream` | session | live pub/sub feed of new Metric/Check/Event/Alert, filtered by subscribed `source_id`s |
 | GET | `/api/adapters` | session | installed adapters + their manifests |
 
 Adapter execution modes:
 - **Pull** (default) — Scheduler runs the subprocess on a per-source interval; non-zero exit or
   timeout marks the source `unreachable` (with debounce, §6).
-- **Stream** — Adapter supervisor keeps the subprocess alive for as long as the source is enabled;
-  restarts on crash with exponential backoff; requires a periodic heartbeat line (per
-  `heartbeat_seconds`) so the core can distinguish "quiet" from "hung/dead."
+- **Stream** — Supervisor behavior (restart/backoff/heartbeat) is implemented and unit-tested, but
+  the composition root does not wire stream Sources because no stream adapter exists. Do not claim
+  runtime stream support until one real adapter proves scheduling, shutdown and recovery end to end.
+- **Push** — `/api/webhooks/:source_id` does not exist. Generic authenticated ingress remains M9
+  and must enter the generated OpenAPI contract when implemented.
 
 `source_id` is always a UUID generated by the core at source-creation time, never derived from
 adapter config (host/port) — this keeps historical metric attribution stable even if a source's
@@ -271,7 +276,7 @@ underlying host/IP changes later.
 | Sources | `/sources` | List of connected sources, per-source status, enable/disable, add/remove |
 | Source detail | `/sources/:id` | Live metric chart (with 24h/7d historical toggle) + live event feed for one source |
 | Notifications | `/notifications` | Configure notification channels (Telegram v1) and alert rules |
-| Add source | drawer over `/sources` | Schema-driven form generated from the chosen adapter's `manifest.json` `config_schema`, with a test-connection step before saving |
+| Add source | drawer over `/sources` | Schema-driven form generated from the chosen adapter's `manifest.json` `config_schema`; “Test connection” currently validates locally and does not probe the target because no endpoint exists |
 | Login | `/login` | Single admin-password form |
 
 ### 5.2 Components / Stores
@@ -282,7 +287,7 @@ underlying host/IP changes later.
 | TanStack Query cache | Layered over the WS store for historical/paginated reads (`/api/metrics`, `/api/events`) and cache invalidation | No polling — cache updates are driven by WS push, not refetch intervals |
 | Status tile | Renders one source: name, status-pulse dot, sparkline, check summary | Reused on Dashboard and Sources |
 | Live chart | `@mantine/charts` (Recharts) time-series with live-append + historical window toggle | Used on Source detail |
-| Add-source form | Renders from a `config_schema` JSON shape | Must support the manifest's declared field types plus a test-connection action |
+| Add-source form | Renders from a `config_schema` JSON shape | Supports declared field types; current test action validates locally, while a real target probe requires a future API contract |
 
 ### 5.3 Design System
 
@@ -372,8 +377,8 @@ human.
 
 ### 7.1 Infrastructure
 
-See [docs/STACK.md](./STACK.md) for concrete commands and tooling. Summary: Go backend (single
-static binary), SQLite storage, React + TanStack Start + Mantine UI v9+ frontend,
+See [docs/STACK.md](./STACK.md) for concrete commands and tooling. Summary: Go backend, SQLite
+storage, separately developed React + TanStack Start + Mantine frontend,
 NDJSON-over-stdio adapter protocol (language-agnostic, easy to debug by hand:
 `echo config | ./adapter`).
 
@@ -408,10 +413,10 @@ claim that an artifact was published or a management host was deployed.
 
 | Concern | Requirement |
 |---------|-------------|
-| Security headers / CORS | Single-origin app (UI served by the same Go binary as the API) — no cross-origin API access in v1, so CORS is `n/a` by design; standard security headers (`X-Content-Type-Options`, `X-Frame-Options`, HSTS when served over TLS) still apply |
+| Security headers / CORS | The current source distribution runs API and web development servers separately; the M11 production artifact targets one origin. Until then no public deployment is claimed. The final edge must set `X-Content-Type-Options`, frame protection and HSTS when TLS renewal is proven |
 | Accessibility target | WCAG 2.2 AA (see §5.3) |
 | Performance budget | Not a marketing/content site — budget expressed as live-update latency instead: new data visible in the UI within a few seconds of an adapter emitting it (§4 WS push design), not classic LCP/INP/CLS thresholds |
-| Observability | Per-source adapter error log (§4) and the `unreachable`/`error` status distinction (§6) are the primary operational signals; no separate metrics/tracing system for the core itself in v1 |
+| Observability | Source-tagged adapter logs (§4) and the `unreachable`/`error` status distinction (§6) are the primary operational signals; no separate metrics/tracing system for the core itself in v1 |
 | Backup / restore | Back up `sqlite` DB file + `secrets.enc.json` separately (the split exists specifically so the DB can be freely copied without leaking credentials, §3); no automated backup adapter in v1 (explicitly out of scope, §1.3) |
 | Other (compliance, SLOs) | n/a — single-user self-hosted tool, no compliance targets for v1 |
 
@@ -419,20 +424,34 @@ claim that an artifact was published or a management host was deployed.
 
 ## 9. Roadmap
 
-| Milestone | Goal | Key Outputs |
-|-----------|------|-------------|
-| `M0` | Contract frozen | `contract.schema.json` committed and versioned |
-| `M1` | Core skeleton | SQLite schema, HTTP API stubs, adapter runner (pull + stream, NDJSON validation), admin-password auth + sessions; a stub adapter's test data is visible via `/api/metrics` and the API is inaccessible without a session |
-| `M2` | `host-metrics-ssh` adapter | Real CPU/RAM/disk data from a test VPS lands in the DB |
-| `M3` | `uptime-http` adapter (+ TLS expiry) | Both adapters run concurrently without a contract change |
-| `M4` | Minimal UI (Sources, Dashboard, Source detail) | A source can be added and its data seen with no manual API calls |
-| `M5` | Alert router + Telegram channel | A real alert fires when a test service goes down |
-| `M6` | Dogfooding (2–4 weeks on the architect's own VPS) | Concrete, prioritized v2 backlog |
-| `M7` (v2, post-review) | `fail2ban-ssh` adapter, Docker adapter, second notification channel | Scoped from dogfooding findings |
-| `M8` (retired experiment) | Host/provisioner prototype | Validated that write-capable deployment is a separate trust domain; removed from the product by Change 15 |
-| `M9` | Projects and generic push ingress | Multiple applications are grouped without adapter-specific UI; external tools can submit authenticated Metric/Check/Event records |
-| `M10` | Adapter extensibility | Versioned manifest capabilities, conformance harness and contributor contract for third-party adapters |
-| `M11` | Core distribution | Reproducible release artifact with UI/adapters, backup/restore and verified local plus always-on management-host deployment paths |
+| Milestone | Status | Goal | Key Outputs |
+|-----------|--------|------|-------------|
+| `M0` | complete | Contract frozen | `contract.schema.json` committed and versioned |
+| `M1` | complete | Core skeleton | SQLite, HTTP API, pull runner plus tested stream supervisor, admin-password auth and sessions |
+| `M2` | complete | `host-metrics-ssh` adapter | Real CPU/RAM/disk collection contract |
+| `M3` | complete | `uptime-http` adapter (+ TLS expiry) | Concurrent adapters without a contract change |
+| `M4` | complete | Minimal UI | Sources, Dashboard, Source detail, WS updates and manifest-backed source form |
+| `M5` | complete | Alert router + Telegram channel | Firing/resolved alert lifecycle and notification-channel management |
+| `M6` | in progress | Dogfooding on infraegev2 | Six production adapters and target template exist; Change 19 records stale Source state, then a separate runtime change proves registration/polling/dashboard before the evidence-based v2 backlog |
+| `M7` | partial | Dogfood extensions | `fail2ban-ssh`, `journal-http`, `beszel-api` and `umami-http` shipped; Docker adapter and second channel are not approved merely because the old row mentioned them |
+| `M8` | retired | Host/provisioner prototype | Write-capable deployment was separated from the trust domain and removed from runtime by Change 15; inert migration data remains |
+| `M9` | planned | Projects and generic push ingress | Multiple applications grouped without adapter-specific UI; authenticated Metric/Check/Event ingress |
+| `M10` | planned | Adapter extensibility | Versioned manifest capabilities, conformance harness and contributor contract before third-party adapters |
+| `M11` | planned | Core distribution | Reproducible API+web+adapters artifact, retention/backup/restore and verified local plus always-on management-host paths |
+
+### 9.1 Current execution sequence
+
+| Order | Scope | Exit evidence |
+|-------|-------|---------------|
+| `0` | Complete documentation Change 19 with linked infraegev2 Change 44 | Six template configs remain manifest-valid; stale local state and ownership boundaries are recorded without secrets; runtime state is unchanged |
+| `1` | Reconcile the six infraegev2 Sources in a dedicated runtime change and run a bounded soak | Stale rows are inventoried before mutation; all six current Sources show fresh data; quiet success, failure and recovery produce a prioritized backlog rather than ad hoc fixes |
+| `2` | Select the smallest M9 slice from dogfood evidence | One project boundary and authenticated push journey are specified end to end; no target mutation or deploy credentials enter sre-kit |
+| `3` | Harden M10 before accepting external adapters | Manifest versioning, conformance and sandbox/trust decisions have executable acceptance evidence |
+| `4` | Build M11 distribution | One reproducible artifact includes API, web and adapters; local install plus the architect-selected always-on path prove backup, restore, upgrade and exact-version health |
+
+Docker collection and a second notification channel remain candidate dogfood findings, not
+pre-approved next changes. M11 retention and off-host backup design must be explicit before the
+core is treated as an always-on service.
 
 ---
 
@@ -448,7 +467,7 @@ claim that an artifact was published or a management host was deployed.
 - Docker-container adapter, backup/dead-man-switch adapter — second iteration, after the contract
   is proven on the first 2–3 adapters. (The web-analytics adapter this list originally deferred
   alongside them shipped as `umami-http` in change-11, once that condition was met — see §1.3.)
-- Pagination/retention policy tooling beyond simple TTL deletion.
+- Pagination/retention policy tooling; no automated TTL deletion exists today.
 - Escalation/repeat notifications for unresolved alerts.
 - Adapter sandboxing — accepted risk while all adapters are first-party (see §11).
 - Strict SSH host-key verification — accepted trust-on-first-connect (TOFU) risk for the existing
@@ -477,7 +496,8 @@ claim that an artifact was published or a management host was deployed.
 
 sre-kit's extension surface is observational:
 
-- pull and stream adapters read existing tools and protocols;
+- pull adapters read existing tools and protocols; stream supervision exists as a tested internal
+  capability but is not part of the wired runtime until a real adapter proves it;
 - the M9 push receiver accepts authenticated Metric/Check/Event records from external producers;
 - every input is normalized through the same Source-scoped validation, storage, alerting and UI
   pipeline;
@@ -485,9 +505,22 @@ sre-kit's extension surface is observational:
 
 Installation and lifecycle automation is explicitly external. A target-owned tool may use SSH,
 Docker Compose, systemd, Kubernetes or a provider API, but those credentials, plans, runs and
-rollback state never become sre-kit entities. The tool integrates by idempotently registering
-Sources and emitting sanitized operational Checks/Events. sre-kit being unavailable must not block
+rollback state never become sre-kit entities. The operator integrates through the Source API/UI
+and sanitized Metric/Check/Event ingestion. sre-kit being unavailable must not block
 the external operation; delayed telemetry may be delivered after connectivity returns.
 
 The boundary keeps infraegev2 useful as dogfood without making its repository layout, Compose
 services, VPS topology or deployment workflow part of the open-source core.
+
+The linked infraegev2 template currently names six Sources: `uptime-http`, `host-metrics-ssh`,
+`fail2ban-ssh`, `journal-http`, `beszel-api` and `umami-http`. infraegev2 owns endpoint readiness,
+accounts and network reachability; sre-kit owns encrypted adapter secrets, Source records, polling,
+status, alerts and UI. The template is manifest-valid; Change 19 records the stale local snapshot,
+while a following runtime change owns reconciliation and fresh dogfood evidence.
+
+Read-only local evidence on 2026-08-20 found five enabled records in `data/sre-kit.db`:
+`beszel-api`, `journal-http` and `umami-http` were `ok` but last seen on 2026-08-15;
+`host-metrics-ssh` and `fail2ban-ssh` were `unreachable` and had never been seen; `uptime-http` was
+absent. No sre-kit process was running during the audit. Treat this database as stale pre-cutover
+state: reconcile it against the six current template entries, then prove fresh timestamps,
+failure/recovery and dashboard rendering before marking M6 dogfood active.

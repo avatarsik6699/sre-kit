@@ -7,7 +7,7 @@
 | Change | `05` |
 | Slug | `alert-router-telegram` |
 | Title | Alert Router + Telegram Channel |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/05-alert-router-telegram` |
 
 ---
@@ -122,7 +122,7 @@ this file.
 ## Gate Checks
 
 > Fast Gate runs per task in `/work`; Full Gate and (with `--release`) Release Gate run once in
-> `/ship`. Both are defined in [docs/STACK.md](./STACK.md) — this section only records
+> `/ship`. Both are defined in [docs/STACK.md](../../STACK.md) — this section only records
 > change-specific overrides.
 
 None.

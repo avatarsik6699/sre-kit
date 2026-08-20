@@ -9,7 +9,7 @@
 | Change | `07` |
 | Slug | `source-secret-ref-fix` |
 | Title | source secret_ref fix |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/07-source-secret-ref-fix` |
 
 ---
@@ -108,7 +108,7 @@ not hand-copy schema/endpoint/type details into this file.
 ## Gate Checks
 
 > Fast Gate runs per task in `/work`; Full Gate and (with `--release`) Release Gate run once in
-> `/ship`. Both are defined in [docs/STACK.md](./STACK.md) — this section only records
+> `/ship`. Both are defined in [docs/STACK.md](../../STACK.md) — this section only records
 > change-specific overrides.
 
 ```bash

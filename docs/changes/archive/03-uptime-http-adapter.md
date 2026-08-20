@@ -9,7 +9,7 @@
 | Change | `03` |
 | Slug | `uptime-http-adapter` |
 | Title | uptime-http adapter |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/03-uptime-http-adapter` |
 
 ---
@@ -97,7 +97,7 @@ of truth; this file only tracks what to build and what's left.
 ## Gate Checks
 
 > Fast Gate runs per task in `/work`; Full Gate and (with `--release`) Release Gate run once in
-> `/ship`. Both are defined in [docs/STACK.md](./STACK.md) — this section only records
+> `/ship`. Both are defined in [docs/STACK.md](../../STACK.md) — this section only records
 > change-specific overrides.
 
 ```bash
