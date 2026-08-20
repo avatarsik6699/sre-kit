@@ -75,6 +75,10 @@ type sourceOutcomeReporter struct {
 	evaluateSourceStatus func(context.Context, string, string) error
 }
 
+func (r sourceOutcomeReporter) ReportPullFailure(_ context.Context, sourceID string, class adapterengineapp.PullFailureClass) {
+	log.Printf("adapterengine: source %s pull failed class=%s", sourceID, class)
+}
+
 func (r sourceOutcomeReporter) ReportPullOutcome(ctx context.Context, sourceID string, report adapterengineapp.PullOutcomeReport) {
 	status := string(report.Outcome)
 	if report.Outcome != adapterengineapp.PullOutcomeOK || !report.EmittedTelemetry {

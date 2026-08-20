@@ -6,12 +6,47 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"sre-kit/internal/contract"
 )
+
+// PullFailureClass is the secret-safe diagnostic category for a failed pull. Raw adapter stderr
+// may contain target-specific or sensitive content, so scheduler logs use only this class.
+type PullFailureClass string
+
+const (
+	PullFailureSpawn         PullFailureClass = "spawn"
+	PullFailureRead          PullFailureClass = "read"
+	PullFailureSubprocess    PullFailureClass = "subprocess"
+	PullFailureIngest        PullFailureClass = "ingest"
+	PullFailureInvalidOutput PullFailureClass = "invalid_output"
+	PullFailureUnknown       PullFailureClass = "unknown"
+)
+
+type pullRunError struct {
+	class PullFailureClass
+	err   error
+}
+
+func (e *pullRunError) Error() string { return "adapterengine: pull failed: " + string(e.class) }
+func (e *pullRunError) Unwrap() error { return e.err }
+
+func newPullRunError(class PullFailureClass, err error) error {
+	return &pullRunError{class: class, err: err}
+}
+
+// PullFailureClassOf extracts the stable category without exposing the wrapped adapter error.
+func PullFailureClassOf(err error) PullFailureClass {
+	var pullErr *pullRunError
+	if errors.As(err, &pullErr) {
+		return pullErr.class
+	}
+	return PullFailureUnknown
+}
 
 // maxConsecutiveInvalidLines auto-disables a source after this many bad NDJSON lines in a row.
 const maxConsecutiveInvalidLines = 10
@@ -73,7 +108,7 @@ type ndjsonLine struct {
 func (r *Runner) RunOnce(ctx context.Context, sourceID string, command string, args []string, config []byte) (RunResult, error) {
 	lines, err := r.spawner.Spawn(ctx, command, args, config)
 	if err != nil {
-		return RunResult{}, fmt.Errorf("adapterengine: spawn: %w", err)
+		return RunResult{}, newPullRunError(PullFailureSpawn, err)
 	}
 
 	var result RunResult
@@ -98,14 +133,14 @@ func (r *Runner) RunOnce(ctx context.Context, sourceID string, command string, a
 		consecutiveInvalid = 0
 		result.LinesProcessed++
 		if err := ingestLine(ctx, r.ingestor, sourceID, raw, r.now().UTC()); err != nil {
-			return result, fmt.Errorf("adapterengine: ingest: %w", err)
+			return result, newPullRunError(PullFailureIngest, err)
 		}
 	}
 	if err := lines.Err(); err != nil {
-		return result, fmt.Errorf("adapterengine: read stdout: %w", err)
+		return result, newPullRunError(PullFailureRead, err)
 	}
 	if err := lines.Wait(); err != nil && !result.AutoDisabled {
-		return result, fmt.Errorf("adapterengine: subprocess: %w", err)
+		return result, newPullRunError(PullFailureSubprocess, err)
 	}
 	return result, nil
 }

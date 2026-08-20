@@ -3,6 +3,7 @@ package application_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -172,11 +173,17 @@ func TestRunOnce_SpawnErrorPropagates(t *testing.T) {
 }
 
 func TestRunOnce_SubprocessExitErrorPropagates(t *testing.T) {
-	source := &fakeLineSource{waitErr: errors.New("exit status 1")}
+	source := &fakeLineSource{waitErr: errors.New("credential=must-not-be-logged")}
 	runner := application.NewRunner(&fakeSpawner{source: source}, &fakeIngestor{}, nil)
 
 	_, err := runner.RunOnce(context.Background(), "src-1", "stub", nil, nil)
 	if err == nil {
 		t.Fatal("RunOnce with a subprocess exit error: want error, got nil")
+	}
+	if got := application.PullFailureClassOf(err); got != application.PullFailureSubprocess {
+		t.Fatalf("failure class = %q, want %q", got, application.PullFailureSubprocess)
+	}
+	if strings.Contains(err.Error(), "credential") {
+		t.Fatalf("error leaked raw subprocess stderr: %q", err)
 	}
 }

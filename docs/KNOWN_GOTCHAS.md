@@ -21,9 +21,21 @@
 - **Fix**: create coordinated active Backlog items in both repositories. Keep adapters,
   normalization, alerts and monitoring UI in sre-kit; keep target installation, credentials,
   Compose/systemd lifecycle and backup/restore in infraegev2 `ops/`. Integrate only through
-  Source registration and Metric/Check/Event ingestion contracts. Current pair: sre-kit Change 19
-  and infraegev2 Change 44; neither may claim six-Source live proof until registration, polling and
-  dashboard evidence exist.
+  Source registration and Metric/Check/Event ingestion contracts. sre-kit Change 19 and
+  infraegev2 Change 44 established the coordinated contract; sre-kit Change 20 then proved the six
+  live Sources, polling and dashboard without mutating the target.
+
+### TanStack Start document markup belongs in `shellComponent`
+
+- **Symptoms**: development navigation logs a hydration mismatch around the virtual Start client
+  script even though the route content itself matches.
+- **Root cause**: the route component returns `<html>`, `<head>` or `<body>` while TanStack Start
+  also owns client bootstrap placement, so server and client document trees differ.
+- **Fix**: keep the document shell and `<Scripts />` in the root route's `shellComponent`; let the
+  root route component render only its routed content (currently `<Outlet />`). Verify with a fresh
+  navigation and current, non-preserved browser console messages.
+- **Prevention**: treat `shellComponent` as the only document boundary; do not move document markup
+  back into the ordinary route component during layout refactors.
 
 ### Retired provisioning tables are intentionally inert
 

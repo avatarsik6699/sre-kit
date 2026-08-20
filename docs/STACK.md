@@ -65,7 +65,7 @@ not the full suite. Fill every row that applies; mark `n/a` for rows that don't 
 |-------|---------|-----------------------|
 | Lint | `test -z "$(find cmd internal adapters -type f -name '*.go' -print0 \| xargs -0 gofmt -l)" && go vet ./...` (backend) / `pnpm --dir web lint` (frontend) | Native Go checks avoid a machine-local linter dependency |
 | Type-check (affected) | `pnpm --dir web typecheck` | frontend only; Go is statically checked by `go vet`/tests |
-| Targeted / affected unit tests | `go test ./... -short` (backend) / `pnpm --dir web vitest related` (frontend) | |
+| Targeted / affected unit tests | `go test ./... -short` (backend) / `pnpm --dir web exec vitest related <changed-source-files> --run --passWithNoTests` (frontend) | Pass the changed frontend source paths relative to `web/`; `related` runs their dependent tests, while an explicitly proven zero-match set is not a gate failure |
 | LSP diagnostics | `no — not yet available, add gopls for Go` | informational — enforced via Required Tooling, not a shell command |
 | API type regen (`openapi-typescript` or equivalent) | `node scripts/api-contracts.mjs` (regen) / `node scripts/api-contracts.mjs --check` (drift check) | run when the API surface changed — see § API contract generation |
 

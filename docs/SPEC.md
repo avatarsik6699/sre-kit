@@ -432,7 +432,7 @@ claim that an artifact was published or a management host was deployed.
 | `M3` | complete | `uptime-http` adapter (+ TLS expiry) | Concurrent adapters without a contract change |
 | `M4` | complete | Minimal UI | Sources, Dashboard, Source detail, WS updates and manifest-backed source form |
 | `M5` | complete | Alert router + Telegram channel | Firing/resolved alert lifecycle and notification-channel management |
-| `M6` | in progress | Dogfooding on infraegev2 | Six production adapters and target template exist; Change 19 records stale Source state, then a separate runtime change proves registration/polling/dashboard before the evidence-based v2 backlog |
+| `M6` | in progress | Dogfooding on infraegev2 | Six production adapters and Sources are reconciled; Change 20 proves fresh polling, quiet success, reversible failure/recovery and authenticated UI rendering. The longer evidence window remains active before the v2 backlog is selected |
 | `M7` | partial | Dogfood extensions | `fail2ban-ssh`, `journal-http`, `beszel-api` and `umami-http` shipped; Docker adapter and second channel are not approved merely because the old row mentioned them |
 | `M8` | retired | Host/provisioner prototype | Write-capable deployment was separated from the trust domain and removed from runtime by Change 15; inert migration data remains |
 | `M9` | planned | Projects and generic push ingress | Multiple applications grouped without adapter-specific UI; authenticated Metric/Check/Event ingress |
@@ -443,11 +443,12 @@ claim that an artifact was published or a management host was deployed.
 
 | Order | Scope | Exit evidence |
 |-------|-------|---------------|
-| `0` | Complete documentation Change 19 with linked infraegev2 Change 44 | Six template configs remain manifest-valid; stale local state and ownership boundaries are recorded without secrets; runtime state is unchanged |
-| `1` | Reconcile the six infraegev2 Sources in a dedicated runtime change and run a bounded soak | Stale rows are inventoried before mutation; all six current Sources show fresh data; quiet success, failure and recovery produce a prioritized backlog rather than ad hoc fixes |
-| `2` | Select the smallest M9 slice from dogfood evidence | One project boundary and authenticated push journey are specified end to end; no target mutation or deploy credentials enter sre-kit |
-| `3` | Harden M10 before accepting external adapters | Manifest versioning, conformance and sandbox/trust decisions have executable acceptance evidence |
-| `4` | Build M11 distribution | One reproducible artifact includes API, web and adapters; local install plus the architect-selected always-on path prove backup, restore, upgrade and exact-version health |
+| `0` | Complete documentation Change 19 with linked infraegev2 Change 44 | Complete: six template configs remain manifest-valid; the stale local state and ownership boundaries were recorded without secrets or runtime mutation |
+| `1` | Reconcile the six infraegev2 Sources in Change 20 and run a bounded soak | Complete: all six Sources have repeated fresh `ok` outcomes; quiet success, reversible failure/recovery and authenticated browser rendering are proven without target-side mutation |
+| `2` | Continue the bounded M6 dogfood evidence window | Observe real operating behavior long enough to rank recurring gaps; keep admin recovery and newly reproduced defects explicit instead of expanding M9 from a single-session snapshot |
+| `3` | Select the smallest M9 slice from accumulated dogfood evidence | One project boundary and authenticated push journey are specified end to end; no target mutation or deploy credentials enter sre-kit |
+| `4` | Harden M10 before accepting external adapters | Manifest versioning, conformance and sandbox/trust decisions have executable acceptance evidence |
+| `5` | Build M11 distribution | One reproducible artifact includes API, web and adapters; local install plus the architect-selected always-on path prove backup, restore, upgrade and exact-version health |
 
 Docker collection and a second notification channel remain candidate dogfood findings, not
 pre-approved next changes. M11 retention and off-host backup design must be explicit before the
@@ -516,11 +517,12 @@ The linked infraegev2 template currently names six Sources: `uptime-http`, `host
 `fail2ban-ssh`, `journal-http`, `beszel-api` and `umami-http`. infraegev2 owns endpoint readiness,
 accounts and network reachability; sre-kit owns encrypted adapter secrets, Source records, polling,
 status, alerts and UI. The template is manifest-valid; Change 19 records the stale local snapshot,
-while a following runtime change owns reconciliation and fresh dogfood evidence.
+and Change 20 owns reconciliation and fresh dogfood evidence.
 
-Read-only local evidence on 2026-08-20 found five enabled records in `data/sre-kit.db`:
-`beszel-api`, `journal-http` and `umami-http` were `ok` but last seen on 2026-08-15;
-`host-metrics-ssh` and `fail2ban-ssh` were `unreachable` and had never been seen; `uptime-http` was
-absent. No sre-kit process was running during the audit. Treat this database as stale pre-cutover
-state: reconcile it against the six current template entries, then prove fresh timestamps,
-failure/recovery and dashboard rendering before marking M6 dogfood active.
+Sanitized local evidence on 2026-08-20 now shows exactly six unique enabled records in
+`data/sre-kit.db`, one for each template. Every Source advanced through at least three independent
+scheduler outcomes and finished fresh `ok`; fail2ban also proved that a successful pull with no new
+records still refreshes Source health. A controlled uptime failure produced critical Checks and
+Source `error`, and restoring the exact prior config returned it to fresh `ok`. Authenticated
+Dashboard, Sources and all six Source-detail routes rendered without current console errors. The
+bounded proof activates M6 dogfooding but does not complete its longer 2–4 week evidence window.

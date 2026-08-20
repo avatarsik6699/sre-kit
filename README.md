@@ -59,13 +59,12 @@ through versioned Source registration and telemetry ingestion contracts.
 
 The live infraegev2 target uses an independent `infraege-ops` Compose project. Its secret-free
 template defines six intended Sources: uptime, root/password SSH host metrics and fail2ban,
-WireGuard journal gateway, Beszel and Umami. Config shapes match the current manifests. A read-only
-2026-08-20 local DB audit found only five older records: uptime absent, both SSH Sources never seen
-and `unreachable`, and the other three last seen on 2026-08-15. This is stale pre-cutover state,
-not live proof; Change 19 records the gap and a following runtime change must reconcile and verify
-registration, polling and dashboard evidence. The
-root/password choice is an accepted target policy; sre-kit consumes it as Source input and does
-not own VPS access hardening or migration.
+WireGuard journal gateway, Beszel and Umami. Config shapes match the current manifests. Change 20
+reconciled exactly those six enabled Sources and proved repeated fresh polling, quiet success,
+reversible uptime failure/recovery, and authenticated Dashboard, Sources and detail rendering.
+This bounded proof starts the longer dogfood evidence window; it does not complete the planned
+2–4 weeks of observation. The root/password choice is an accepted target policy; sre-kit consumes
+it as Source input and does not own VPS access hardening or migration.
 
 See [`docs/SPEC.md`](docs/SPEC.md) for the full technical specification (data model, API
 contract, auth model, roadmap) and [`docs/STACK.md`](docs/STACK.md) for concrete stack details,
@@ -146,9 +145,10 @@ reference implementations, and each adapter's `manifest.json` for the config-sch
 ## Project status
 
 The core v1 feature set is implemented: unified contract, six production pull adapters, live
-dashboard and Telegram alerting. End-to-end dogfood is not complete until infraegev2's stale local
-Source set is reconciled to the six current target configurations and observed. Generic push ingress, adapter extensibility hardening and a combined
-deployable distribution remain later milestones. See [`docs/SPEC.md`](docs/SPEC.md) §9 for the roadmap and
+dashboard and Telegram alerting. The six infraegev2 Sources have passed bounded end-to-end
+reconciliation; M6 remains in progress while the longer dogfood evidence window accumulates.
+Generic push ingress, adapter extensibility hardening and a combined deployable distribution remain
+later milestones. See [`docs/SPEC.md`](docs/SPEC.md) §9 for the roadmap and
 [`docs/changes/archive/`](docs/changes/archive/) for the history of how each piece was built.
 
 ## Development workflow

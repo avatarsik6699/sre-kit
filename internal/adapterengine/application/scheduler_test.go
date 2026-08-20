@@ -19,11 +19,18 @@ func (c *countingSpawner) Spawn(context.Context, string, []string, []byte) (appl
 }
 
 type outcomeRecorder struct {
-	reports chan application.PullOutcomeReport
+	reports  chan application.PullOutcomeReport
+	failures chan application.PullFailureClass
 }
 
 func (r *outcomeRecorder) ReportPullOutcome(_ context.Context, _ string, report application.PullOutcomeReport) {
 	r.reports <- report
+}
+
+func (r *outcomeRecorder) ReportPullFailure(_ context.Context, _ string, class application.PullFailureClass) {
+	if r.failures != nil {
+		r.failures <- class
+	}
 }
 
 type cancellationSpawner struct{}
@@ -152,5 +159,50 @@ func TestScheduler_DoesNotReportOwnerCancellationAsUnreachable(t *testing.T) {
 	case report := <-reporter.reports:
 		t.Fatalf("owner cancellation reported as pull outcome: %+v", report)
 	default:
+	}
+}
+
+func TestScheduler_ReportsSecretSafeFailureClass(t *testing.T) {
+	tests := []struct {
+		name  string
+		spawn *fakeSpawner
+		want  application.PullFailureClass
+	}{
+		{
+			name:  "spawn",
+			spawn: &fakeSpawner{err: errors.New("credential=must-not-be-logged")},
+			want:  application.PullFailureSpawn,
+		},
+		{
+			name: "invalid output",
+			spawn: &fakeSpawner{source: &fakeLineSource{lines: []string{
+				`{"type":"bogus"}`,
+			}}},
+			want: application.PullFailureInvalidOutput,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reporter := &outcomeRecorder{
+				reports:  make(chan application.PullOutcomeReport, 1),
+				failures: make(chan application.PullFailureClass, 1),
+			}
+			runner := application.NewRunner(tt.spawn, &fakeIngestor{}, nil)
+			scheduler := application.NewScheduler(runner, reporter)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			scheduler.Schedule(ctx, application.PullJob{SourceID: "src-1", Command: "adapter", Interval: time.Hour})
+
+			select {
+			case got := <-reporter.failures:
+				if got != tt.want {
+					t.Fatalf("failure class = %q, want %q", got, tt.want)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for pull failure diagnostic")
+			}
+			scheduler.Cancel("src-1")
+		})
 	}
 }

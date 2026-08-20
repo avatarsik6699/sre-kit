@@ -35,14 +35,11 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
   }),
   component: RootComponent,
+  shellComponent: RootDocument,
 });
 
 function RootComponent() {
-  return (
-    <RootDocument>
-      <Outlet />
-    </RootDocument>
-  );
+  return <Outlet />;
 }
 
 type RootDocumentProps = { children: React.ReactNode };

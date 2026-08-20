@@ -19,11 +19,17 @@ type PullJob struct {
 // Scheduler runs each scheduled PullJob's Runner.RunOnce on its own ticker, one goroutine per
 // source, until the job is cancelled or the Scheduler is shut down.
 type Scheduler struct {
-	runner   *Runner
-	reporter PullOutcomeReporter
+	runner          *Runner
+	reporter        PullOutcomeReporter
+	failureReporter PullFailureReporter
 
 	mu      sync.Mutex
 	cancels map[string]context.CancelFunc
+}
+
+// PullFailureReporter receives only a stable failure class, never raw stderr or resolved config.
+type PullFailureReporter interface {
+	ReportPullFailure(ctx context.Context, sourceID string, class PullFailureClass)
 }
 
 // NewScheduler wires a Scheduler to the Runner it drives and, optionally, the source-outcome
@@ -32,6 +38,9 @@ func NewScheduler(runner *Runner, reporter ...PullOutcomeReporter) *Scheduler {
 	s := &Scheduler{runner: runner, cancels: map[string]context.CancelFunc{}}
 	if len(reporter) > 0 {
 		s.reporter = reporter[0]
+		if failureReporter, ok := reporter[0].(PullFailureReporter); ok {
+			s.failureReporter = failureReporter
+		}
 	}
 	return s
 }
@@ -97,6 +106,14 @@ func (s *Scheduler) invoke(ctx context.Context, job PullJob) {
 	// outcome and must not race a disabled or deleted Source back to "unreachable".
 	if s.reporter == nil || ctx.Err() != nil {
 		return
+	}
+	if s.failureReporter != nil {
+		switch {
+		case result.AutoDisabled || result.InvalidLines > 0:
+			s.failureReporter.ReportPullFailure(ctx, job.SourceID, PullFailureInvalidOutput)
+		case err != nil:
+			s.failureReporter.ReportPullFailure(ctx, job.SourceID, PullFailureClassOf(err))
+		}
 	}
 
 	report := PullOutcomeReport{EmittedTelemetry: result.LinesProcessed > 0}
