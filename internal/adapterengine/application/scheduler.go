@@ -19,15 +19,21 @@ type PullJob struct {
 // Scheduler runs each scheduled PullJob's Runner.RunOnce on its own ticker, one goroutine per
 // source, until the job is cancelled or the Scheduler is shut down.
 type Scheduler struct {
-	runner *Runner
+	runner   *Runner
+	reporter PullOutcomeReporter
 
 	mu      sync.Mutex
 	cancels map[string]context.CancelFunc
 }
 
-// NewScheduler wires a Scheduler to the Runner it drives.
-func NewScheduler(runner *Runner) *Scheduler {
-	return &Scheduler{runner: runner, cancels: map[string]context.CancelFunc{}}
+// NewScheduler wires a Scheduler to the Runner it drives and, optionally, the source-outcome
+// reporter that keeps connectivity state current after every pull.
+func NewScheduler(runner *Runner, reporter ...PullOutcomeReporter) *Scheduler {
+	s := &Scheduler{runner: runner, cancels: map[string]context.CancelFunc{}}
+	if len(reporter) > 0 {
+		s.reporter = reporter[0]
+	}
+	return s
 }
 
 // Schedule starts (or restarts, if already scheduled) job under ctx. RunOnce fires immediately,
@@ -86,8 +92,21 @@ func (s *Scheduler) runLoop(ctx context.Context, job PullJob) {
 }
 
 func (s *Scheduler) invoke(ctx context.Context, job PullJob) {
-	_, _ = s.runner.RunOnce(ctx, job.SourceID, job.Command, job.Args, job.Config)
-	// Per-invocation errors (spawn failure, non-zero exit, misbehaving-adapter auto-disable) are
-	// Runner's concern; the scheduler's job is only to keep firing on interval. Surfacing
-	// per-invocation status to an operator view is deferred to M4's Sources/Dashboard UI.
+	result, err := s.runner.RunOnce(ctx, job.SourceID, job.Command, job.Args, job.Config)
+	// Cancel/disable/shutdown owns this context. Its cancellation is not a target connectivity
+	// outcome and must not race a disabled or deleted Source back to "unreachable".
+	if s.reporter == nil || ctx.Err() != nil {
+		return
+	}
+
+	report := PullOutcomeReport{EmittedTelemetry: result.LinesProcessed > 0}
+	switch {
+	case result.AutoDisabled || result.InvalidLines > 0:
+		report.Outcome = PullOutcomeError
+	case err != nil:
+		report.Outcome = PullOutcomeUnreachable
+	default:
+		report.Outcome = PullOutcomeOK
+	}
+	s.reporter.ReportPullOutcome(ctx, job.SourceID, report)
 }

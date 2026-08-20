@@ -24,3 +24,29 @@ type TelemetryIngestor interface {
 // (10 consecutive invalid NDJSON lines, docs/SPEC.md §4). A func type rather than an interface so
 // main.go can adapt internal/sources/application.Service.Disable directly with a closure.
 type SourceDisabler func(ctx context.Context, sourceID string) error
+
+// PullOutcome describes the source-level result of one complete pull invocation. It deliberately
+// does not expose subprocess errors outside adapterengine: consumers only need the stable
+// connectivity semantics defined by docs/SPEC.md §6.
+type PullOutcome string
+
+const (
+	PullOutcomeOK          PullOutcome = "ok"
+	PullOutcomeUnreachable PullOutcome = "unreachable"
+	PullOutcomeError       PullOutcome = "error"
+)
+
+// PullOutcomeReport carries the normalized result of one pull. EmittedTelemetry lets the
+// composition root avoid overwriting the finer Source status already derived while ingesting a
+// check, while a successful quiet adapter can still be marked seen and healthy.
+type PullOutcomeReport struct {
+	Outcome          PullOutcome
+	EmittedTelemetry bool
+}
+
+// PullOutcomeReporter receives one report after every completed pull invocation. The scheduler
+// treats reporting as best-effort: telemetry collection must continue even if status persistence
+// or alert evaluation temporarily fails.
+type PullOutcomeReporter interface {
+	ReportPullOutcome(ctx context.Context, sourceID string, report PullOutcomeReport)
+}

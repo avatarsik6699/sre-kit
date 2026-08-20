@@ -73,25 +73,21 @@
   first successful connect, alongside the source's config, and fail loudly on mismatch after).
 - **Prevention**: n/a until a TOFU/pinning implementation exists.
 
-### Pull-adapter subprocess failure never marks a source `unreachable`
+### Pull-adapter outcome reporting must not depend on emitted telemetry
 
-- **Symptoms**: a source whose adapter subprocess exits non-zero or times out keeps whatever
-  `sources.last_status` it last had (or the `unreachable` default from `Create`, if it never
-  successfully reported) — it never transitions to `unreachable` on a live failure, and
-  `internal/alertrouter`'s connectivity-alert debounce (docs/SPEC.md §6) never sees a status to
-  react to for this path.
-- **Root cause**: `internal/adapterengine/application.Runner.RunOnce` only calls its `disable`
-  hook after 10 consecutive invalid NDJSON lines (`maxConsecutiveInvalidLines`); a subprocess spawn
-  error, non-zero exit, or timeout just returns an `error` from `RunOnce` with no status-hook call
-  at all. SPEC §4 documents "non-zero exit or timeout marks the source `unreachable` (with
-  debounce)" but this was never wired.
-- **Fix**: none yet — out of scope for every change through `05-alert-router-telegram` (all
-  explicitly exclude `internal/adapterengine/**`). Fix by having `Runner`/`Scheduler` call a
-  status-hook (mirroring `SourceDisabler`) on subprocess failure, wired in `cmd/server/main.go` to
-  both `sourcesService.MarkSeen(ctx, id, "unreachable")` and
-  `alertrouterService.EvaluateSourceStatus(ctx, id, "unreachable")`.
-- **Prevention**: n/a until wired; see `docs/changes/05-alert-router-telegram.md` (or its archived
-  location once shipped) Implementation Notes for the alert-router-side context.
+- **Symptoms**: before Change 16, a source whose adapter exited non-zero kept its prior status, and
+  a successful event adapter with no records (for example, no recent bans) remained
+  `unreachable`. Connectivity-alert debounce therefore never saw either failure or recovery.
+- **Root cause**: Source status was updated only as a side effect of telemetry ingestion. A pull
+  invocation itself had no outcome port, even though both an empty success and a subprocess error
+  carry source-level connectivity information.
+- **Fix**: `Scheduler` now reports one normalized outcome after every pull. Spawn/non-zero failures
+  become `unreachable`, invalid output becomes `error`, and an empty success becomes `ok`.
+  Successful pulls that emitted telemetry resolve connectivity alerts without overwriting the
+  finer Source status already derived from that telemetry.
+- **Prevention**: every new pull execution path must exercise quiet success, emitted success,
+  subprocess failure and invalid-output cases in `scheduler_test.go`; never infer connectivity
+  solely from whether an adapter emitted a Metric, Check or Event.
 
 <!--
 ### [Title — short, punchy, searchable]

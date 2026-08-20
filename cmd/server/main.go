@@ -67,6 +67,26 @@ func (p alertHubPublisher) Publish(frame alertrouterapp.Frame) {
 	p.hub.Publish(wshub.Frame{Type: frame.Type, SourceID: frame.SourceID, Payload: frame.Payload})
 }
 
+// sourceOutcomeReporter is the composition-root bridge from adapterengine's normalized pull
+// outcome to the Source rollup and connectivity-alert bounded contexts. Function fields keep the
+// adapter narrow and make its cross-context semantics directly testable without a DI framework.
+type sourceOutcomeReporter struct {
+	markSeen             func(context.Context, string, string) error
+	evaluateSourceStatus func(context.Context, string, string) error
+}
+
+func (r sourceOutcomeReporter) ReportPullOutcome(ctx context.Context, sourceID string, report adapterengineapp.PullOutcomeReport) {
+	status := string(report.Outcome)
+	if report.Outcome != adapterengineapp.PullOutcomeOK || !report.EmittedTelemetry {
+		if err := r.markSeen(ctx, sourceID, status); err != nil {
+			log.Printf("adapterengine: source %s: persist pull outcome %s: %v", sourceID, status, err)
+		}
+	}
+	if err := r.evaluateSourceStatus(ctx, sourceID, status); err != nil {
+		log.Printf("adapterengine: source %s: evaluate pull outcome %s: %v", sourceID, status, err)
+	}
+}
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -156,7 +176,10 @@ func main() {
 			return err
 		},
 	)
-	scheduler := adapterengineapp.NewScheduler(adapterRunner)
+	scheduler := adapterengineapp.NewScheduler(adapterRunner, sourceOutcomeReporter{
+		markSeen:             sourcesService.MarkSeen,
+		evaluateSourceStatus: alertrouterService.EvaluateSourceStatus,
+	})
 
 	// schedulerCtx is the scheduler's own lifetime — deliberately not the caller's request
 	// context. A scheduled job must keep running after the HTTP request that created/enabled its
