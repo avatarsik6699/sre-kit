@@ -15,7 +15,7 @@ import (
 )
 
 // TestStubAdapter_EndToEndPullPipeline exercises the real pull-mode path adapters/stub exists for
-// (docs/changes/01-core-skeleton.md B11): build the stub binary, spawn it through the real
+// (docs/changes/archive/01-core-skeleton.md B11): build the stub binary, spawn it through the real
 // ProcessSpawner, run it through Runner (real contract.schema.json validation), and confirm its
 // fixture metrics land in a real SQLite telemetry store via /api/metrics' backing Query.
 func TestStubAdapter_EndToEndPullPipeline(t *testing.T) {

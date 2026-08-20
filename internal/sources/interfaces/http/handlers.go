@@ -1,6 +1,6 @@
 // Package http exposes the Source use-cases as /api/sources (GET/POST/PATCH/DELETE), per
 // docs/SPEC.md §4. Session-gating is applied by the composition root once internal/auth's
-// middleware is wired (docs/changes/01-core-skeleton.md B9), not by this package directly.
+// middleware is wired (docs/changes/archive/01-core-skeleton.md B9), not by this package directly.
 package http
 
 import (

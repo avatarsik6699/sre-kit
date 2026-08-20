@@ -32,7 +32,7 @@ export const addSourceFormUtils = {
    * Client-side "test connection": validates the entered config against the manifest's
    * config_schema (required fields present, numeric bounds respected). No backend endpoint
    * exists yet to actually probe the target (SPEC §4's API table has no test-connection route) —
-   * see docs/changes/04-minimal-ui.md § Implementation Notes for the follow-up.
+   * see docs/changes/archive/04-minimal-ui.md § Implementation Notes for the follow-up.
    */
   validate(schema: ConfigSchema, values: Record<string, unknown>): string[] {
     const errors: string[] = [];

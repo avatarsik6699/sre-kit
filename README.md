@@ -11,9 +11,9 @@ okay right now": a metrics tool, an uptime checker, container logs, `fail2ban` c
 SSH, a certificate-expiry script. Each has its own data model, its own UI, its own alerting setup.
 
 sre-kit normalizes all of that into four entities — **Metric**, **Check**, **Event**, and the
-**Alert**s derived from them — collected over plain SSH (no agent to install on the monitored
-host) and shown on one live-updating dashboard, with a single alert-rule engine notifying you over
-Telegram.
+**Alert**s derived from them — collected by pull adapters over SSH, HTTP or TCP and shown on one
+live-updating dashboard, with a single alert-rule engine notifying you over Telegram. The current
+SSH adapters need no agent on the monitored host; HTTP adapters consume target-owned endpoints.
 
 ## Features
 
@@ -146,7 +146,8 @@ reference implementations, and each adapter's `manifest.json` for the config-sch
 
 The core v1 feature set is implemented: unified contract, six production pull adapters, live
 dashboard and Telegram alerting. The six infraegev2 Sources have passed bounded end-to-end
-reconciliation; M6 remains in progress while the longer dogfood evidence window accumulates.
+reconciliation. M6 remains in progress, but its longer dogfood evidence window is paused while the
+workstation core is off; no polling or alerts accumulate during that pause.
 Generic push ingress, adapter extensibility hardening and a combined deployable distribution remain
 later milestones. See [`docs/SPEC.md`](docs/SPEC.md) §9 for the roadmap and
 [`docs/changes/archive/`](docs/changes/archive/) for the history of how each piece was built.

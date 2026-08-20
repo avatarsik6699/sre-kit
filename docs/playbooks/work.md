@@ -170,9 +170,11 @@ the item's domain and confirm the mandated tool/skill was actually used:
 - TypeScript/Python change → run an LSP diagnostics pass on the changed files.
 - New/changed API surface → regenerate types (`openapi-typescript` or the project's declared
   equivalent) and re-typecheck the frontend consumer.
-- Architecture-level decision → the architecture skill must have been consulted during planning.
-- Frontend design decision → the `frontend-design` skill must have been consulted.
-- Backend/API design decision → the `backend-design` skill, if available in this environment.
+- Frontend architecture decision → the `frontend-architecture` skill must have been consulted
+  during planning or architecture review.
+- Backend architecture/API design decision → the `backend-architecture` skill must have been
+  consulted during planning or architecture review.
+- Frontend UI/design decision → the `impeccable` skill must have been consulted.
 
 This is not optional or "if convenient." If a mandated tool genuinely isn't available in this
 environment, report it explicitly as skipped with the reason — do not check off the item silently

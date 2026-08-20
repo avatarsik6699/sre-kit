@@ -194,7 +194,7 @@ func filterEvents(events []banEvent, since time.Time, jail string) []banEvent {
 }
 
 // toNDJSON converts a parsed banEvent into the wire event line: "warn" for a ban, "info" for an
-// unban (docs/changes/06-fail2ban-ssh-adapter.md I2).
+// unban (docs/changes/archive/06-fail2ban-ssh-adapter.md I2).
 func toNDJSON(ev banEvent) ndjsonLine {
 	level := "info"
 	verb := "unbanned"

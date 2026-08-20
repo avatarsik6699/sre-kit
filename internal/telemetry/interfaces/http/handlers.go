@@ -1,6 +1,6 @@
 // Package http exposes GET /api/metrics, /api/checks, /api/events, per docs/SPEC.md §4.
 // Session-gating is applied globally by the composition root via internal/auth's middleware
-// (docs/changes/01-core-skeleton.md B9's httpserver.Server.Use wiring), not by this package
+// (docs/changes/archive/01-core-skeleton.md B9's httpserver.Server.Use wiring), not by this package
 // directly.
 package http
 

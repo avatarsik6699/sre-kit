@@ -1,7 +1,7 @@
 // @ts-check
 // The FSD-layer-boundary `no-restricted-imports` group documented in docs/STACK.md § Frontend
 // tooling lands once real page/feature/entity layers exist at M4 (there's nothing to bound yet —
-// see docs/changes/01-core-skeleton.md). The no-restricted-globals group
+// see docs/changes/archive/01-core-skeleton.md). The no-restricted-globals group
 // (window/document/navigator/localStorage/sessionStorage/fetch/process) is fully wired below,
 // including shared/api/client.ts's `fetch` exemption (I13).
 import js from "@eslint/js";

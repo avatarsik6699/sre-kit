@@ -52,8 +52,7 @@ func NewToken() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-// GeneratePassword generates a random admin password for first-run bootstrap (docs/SPEC.md §6:
-// "the core generates or accepts an admin password on first run").
+// GeneratePassword generates a random admin password for first-run bootstrap (docs/SPEC.md §6).
 func GeneratePassword() (string, error) {
 	buf := make([]byte, 18)
 	if _, err := rand.Read(buf); err != nil {

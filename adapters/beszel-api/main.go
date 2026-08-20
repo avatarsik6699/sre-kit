@@ -1,4 +1,4 @@
-// Command beszel-api is a pull-mode adapter (docs/changes/09-beszel-api-adapter.md): it
+// Command beszel-api is a pull-mode adapter (docs/changes/archive/09-beszel-api-adapter.md): it
 // authenticates against a configured Beszel instance's PocketBase-backed HTTP API, fetches the
 // latest host and per-container stats for one system, and emits NDJSON metric lines on stdout. A
 // non-zero exit (connection failure, auth rejected, non-2xx response, unparsable config) is how the

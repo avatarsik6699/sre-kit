@@ -1,4 +1,4 @@
-// Command umami-http is a pull-mode adapter (docs/changes/11-umami-http-adapter.md): it
+// Command umami-http is a pull-mode adapter (docs/changes/archive/11-umami-http-adapter.md): it
 // authenticates against a configured Umami instance's REST API, fetches aggregate traffic stats
 // for one website over the poll's lookback window, and emits NDJSON metric lines on stdout. A
 // non-zero exit (connection failure, login rejected, non-2xx response, unparsable config) is how

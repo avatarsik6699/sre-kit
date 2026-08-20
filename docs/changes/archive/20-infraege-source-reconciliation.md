@@ -7,7 +7,7 @@
 | Change | `20` |
 | Slug | `infraege-source-reconciliation` |
 | Title | infraege Source Reconciliation |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/20-infraege-source-reconciliation` |
 
 ---

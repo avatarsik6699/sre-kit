@@ -142,7 +142,7 @@ type fakeSSHServerOptions struct {
 	rejectAuth bool
 }
 
-// startFakeSSHServer runs a minimal in-process SSH server (docs/changes/02-host-metrics-ssh-adapter.md
+// startFakeSSHServer runs a minimal in-process SSH server (docs/changes/archive/02-host-metrics-ssh-adapter.md
 // I3: exercise the connect/auth-failure path without a real host) that accepts one connection,
 // authenticates by password, and on any "exec" request writes opts.output and exits 0.
 func startFakeSSHServer(t *testing.T, opts fakeSSHServerOptions) string {

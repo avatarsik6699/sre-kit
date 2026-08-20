@@ -250,7 +250,7 @@ func TestMarkSeen_UnknownIDReturnsErrNotFound(t *testing.T) {
 	}
 }
 
-// --- secret_ref resolution (docs/changes/07-source-secret-ref-fix.md) ---
+// --- secret_ref resolution (docs/changes/archive/07-source-secret-ref-fix.md) ---
 
 type fakeSecretsStore struct {
 	nextID      int

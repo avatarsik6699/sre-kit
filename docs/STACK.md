@@ -134,9 +134,9 @@ tool that isn't available must be reported as skipped with a reason, never silen
 | Frontend UI change | Playwright MCP / chrome-devtools MCP (screenshot + console check) | after implementing, before checking off | `yes` (Playwright MCP) |
 | TypeScript / Go change | LSP diagnostics | after implementing, before checking off | TypeScript LSP available; Go `gopls` not configured, so Go relies on `go vet`/tests and must report LSP as skipped |
 | New/changed API surface | `openapi-typescript` (or equivalent) regen + frontend re-typecheck | after backend contract change | `yes` — `swag` annotations + `node scripts/api-contracts.mjs` (see § API contract generation) |
-| Architecture-level decision | architecture skill | during planning | `no` |
-| Frontend design decision | `frontend-design` skill | during `/plan` §5.3 and design Backlog items | `no` |
-| Backend/API design decision | `backend-design` skill | during `/plan` §4 and backend-architecture Backlog items | `no` |
+| Frontend architecture decision | `frontend-architecture` skill | during planning and architecture review | `yes` — installed in the local Codex skill catalog |
+| Backend architecture/API design decision | `backend-architecture` skill | during planning and architecture review | `yes` — installed in the local Codex skill catalog |
+| Frontend UI/design decision | `impeccable` skill | during `/plan` §5.3 and design Backlog items | `yes` — installed in the local Codex skill catalog |
 
 Mark a row `no` (not available) rather than leaving it blank — an unmarked row is otherwise
 ambiguous between "not asked" and "not needed."

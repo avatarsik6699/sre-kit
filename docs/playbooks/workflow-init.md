@@ -1,5 +1,9 @@
 # workflow-init — Canonical Playbook
 
+> Source-package reference only. In an integrated project such as sre-kit, `project-files/` and
+> `docs/templates/` are intentionally absent: do not execute this playbook there. Use the installed
+> `plan`, `work` and `ship` workflows instead. Keep this file only as the bootstrap source contract.
+
 Integrate the SDD workflow into a target project (new or existing). This skill runs **once per
 project**, from a freshly cloned `sdd-workflow` checkout. After it succeeds, the workflow is part
 of the target project and the cloned repo can be deleted.
@@ -191,9 +195,9 @@ Ask the user for:
 5. **Required tooling availability** — ask which of the following are set up in this environment,
    to fill `docs/STACK.md`'s Required Tooling table honestly rather than assuming: Playwright MCP
    and/or chrome-devtools MCP (frontend visual verification), an LSP server for the project's
-   languages, a `frontend-design` skill, a `backend-design` skill, an architecture skill. Any
-   answered "no" gets recorded as "not available — do not enforce" rather than left silently
-   assumed.
+   languages, an `impeccable` UI-review skill, a `frontend-architecture` skill and a
+   `backend-architecture` skill. Any answered "no" gets recorded as "not available — do not
+   enforce" rather than left silently assumed.
 6. **Container / OS notes** worth recording in `KNOWN_GOTCHAS.md`. If unsure, skip.
 
 Do not ask all of these in one wall of text — group by area, accept "skip" / `n/a` per row.

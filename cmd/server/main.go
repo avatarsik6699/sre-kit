@@ -127,7 +127,7 @@ func main() {
 	srv.Use(authhttp.RequireSession(authService))
 
 	// adapterConfigSchema resolves an adapter's config_schema by name so sourcesService can tell
-	// which config fields are secrets (docs/changes/07-source-secret-ref-fix.md) — reuses the same
+	// which config fields are secrets (docs/changes/archive/07-source-secret-ref-fix.md) — reuses the same
 	// ListInstalled lookup reconcileSchedule does below, by adapter name rather than pull-mode
 	// job info. sourcesService deliberately doesn't import adapterengine directly (ports, not
 	// direct imports).
@@ -170,7 +170,7 @@ func main() {
 	telemetryhttp.NewHandlers(telemetryService, hub).Register(srv.Mux)
 
 	// Adapter engine: pull-mode sources are kept scheduled in sync with source state via
-	// sourcesService.OnChange below (see docs/changes/01-core-skeleton.md Architect Review Notes
+	// sourcesService.OnChange below (see docs/changes/archive/01-core-skeleton.md Architect Review Notes
 	// R1). Stream-mode sources aren't wired yet — no stream adapter exists to exercise it.
 	adapterRunner := adapterengineapp.NewRunner(
 		adapterengineinfra.NewProcessSpawner(),

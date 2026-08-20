@@ -8,7 +8,7 @@ import {
 const reporter = createClientErrorReporter(consoleSink);
 
 /**
- * Mounted once in the root document (docs/changes/01-core-skeleton.md I10). Renders nothing —
+ * Mounted once in the root document (docs/changes/archive/01-core-skeleton.md I10). Renders nothing —
  * pure side-effect component that wires up global client-error capture for the app's lifetime.
  */
 export const ClientErrorMonitor: React.FC = () => {

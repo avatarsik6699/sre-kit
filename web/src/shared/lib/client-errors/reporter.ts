@@ -52,7 +52,7 @@ export function createClientErrorReporter(
 
 /**
  * Stubbed submit sink — logs locally only. No `/api/client-errors` backend endpoint exists in
- * this change (docs/changes/01-core-skeleton.md § Do NOT touch); swap this for a network sink
+ * this change (docs/changes/archive/01-core-skeleton.md § Do NOT touch); swap this for a network sink
  * once a real endpoint lands.
  */
 export const consoleSink: ClientErrorSink = (error) => {

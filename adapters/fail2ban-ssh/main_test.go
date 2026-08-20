@@ -172,7 +172,7 @@ type fakeSSHServerOptions struct {
 	rejectAuth bool
 }
 
-// startFakeSSHServer runs a minimal in-process SSH server (docs/changes/06-fail2ban-ssh-adapter.md
+// startFakeSSHServer runs a minimal in-process SSH server (docs/changes/archive/06-fail2ban-ssh-adapter.md
 // I3: exercise the connect/auth-failure path without a real host, same technique as change-02's
 // I3) that accepts one connection, authenticates by password, and on any "exec" request writes
 // opts.output and exits 0.

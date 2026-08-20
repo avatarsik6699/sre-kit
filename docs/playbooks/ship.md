@@ -72,8 +72,11 @@ Report the full table and stop. Do not commit, merge, or archive.
 1. Commit any outstanding changes on `feature/NN-slug` using the change file's Commit Message.
 2. Merge `feature/NN-slug` into local `main` (fast-forward if possible, otherwise a normal merge
    commit — never rewrite history).
-3. Move `docs/changes/NN-slug.md` to `docs/changes/archive/NN-slug.md`.
-4. Report PASS, the merge result, and the archive path.
+3. Set the change file's metadata `Status` to `archived`; verify no unchecked Backlog or Architect
+   Review Notes remain.
+4. Move `docs/changes/NN-slug.md` to `docs/changes/archive/NN-slug.md` and commit that archive
+   update on local `main`.
+5. Report PASS, the merge result, and the archive path.
 
 ### 5. `--release` only — Release Gate and deploy
 

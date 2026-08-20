@@ -1,7 +1,7 @@
 -- 0001_init.sql — initial schema, per docs/SPEC.md §3.
 --
 -- alerts / alert_rules are created here for forward-compat only: no Go code in change 01 reads or
--- writes them (internal/alerts is deferred to M5, see docs/changes/01-core-skeleton.md § Do NOT
+-- writes them (internal/alerts is deferred to M5, see docs/changes/archive/01-core-skeleton.md § Do NOT
 -- touch). metrics_rollup is reserved for a v2 downsampling feature and is unused in v1.
 
 CREATE TABLE IF NOT EXISTS sources (

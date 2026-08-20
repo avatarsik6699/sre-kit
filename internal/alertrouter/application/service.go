@@ -198,7 +198,7 @@ func (s *Service) resolveByRule(ctx context.Context, ruleID string) error {
 // "error" fires immediately, "ok" resolves any open connectivity alert. This has no NotifyChannel
 // of its own — v1 has no UI to configure one for a system-level alert, so it fires/resolves
 // silently on the WS stream (still visible on the Dashboard/Alerts rail) without a Telegram push.
-// See docs/changes/05-alert-router-telegram.md Implementation Notes for the scope decision this
+// See docs/changes/archive/05-alert-router-telegram.md Implementation Notes for the scope decision this
 // reflects (adapterengine, which is where "unreachable" would actually be detected, is out of this
 // change's Files list).
 func (s *Service) EvaluateSourceStatus(ctx context.Context, sourceID, status string) error {

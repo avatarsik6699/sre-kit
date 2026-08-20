@@ -15,7 +15,7 @@ export const notificationChannelFormUtils = {
    * Client-side "test-send": validates the entered chat_id/bot_token look plausible before
    * saving. No backend probe endpoint exists (only CRUD on /api/notification-channels, per
    * docs/SPEC.md §4) — same scope decision as change 04's add-source-form test-connection step
-   * (see docs/changes/04-minimal-ui.md § Implementation Notes).
+   * (see docs/changes/archive/04-minimal-ui.md § Implementation Notes).
    */
   validate(chatId: string, botToken: string): string[] {
     const errors: string[] = [];

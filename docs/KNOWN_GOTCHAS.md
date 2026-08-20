@@ -81,7 +81,8 @@
   adapter (`adapters/host-metrics-ssh/main.go`) dials with `ssh.InsecureIgnoreHostKey()`, so it
   will happily connect to a spoofed host (MITM) with no warning.
 - **Root cause**: v1 has no `known_hosts` store or first-connection TOFU (trust-on-first-use)
-  pinning mechanism; building one was out of scope for `M2` (docs/changes/02-host-metrics-ssh-adapter.md).
+  pinning mechanism; building one was out of scope for `M2`
+  (`docs/changes/archive/02-host-metrics-ssh-adapter.md`).
 - **Fix**: none yet — accepted for the current first-party dogfood, but do not describe the adapter
   connection as pinned merely because infraegev2's administrative SSH wrapper is pinned. Revisit
   before shared/team use, third-party adapters or an always-on M11 deployment (e.g. persist the

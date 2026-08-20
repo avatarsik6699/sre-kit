@@ -1,4 +1,4 @@
-// Command journal-http is a pull-mode adapter (docs/changes/08-journal-http-adapter.md): it queries
+// Command journal-http is a pull-mode adapter (docs/changes/archive/08-journal-http-adapter.md): it queries
 // a configured host's systemd-journal-gatewayd HTTP API for recent journal entries and emits NDJSON
 // event lines on stdout. A non-zero exit (connection failure, TLS handshake failure, non-2xx
 // response, unparsable config) is how the core's Runner learns to mark the source `unreachable`

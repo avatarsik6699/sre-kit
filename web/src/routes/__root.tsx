@@ -1,4 +1,4 @@
-// Root route (docs/changes/01-core-skeleton.md I10): document shell, dark-default Mantine theme
+// Root route (docs/changes/archive/01-core-skeleton.md I10): document shell, dark-default Mantine theme
 // (docs/SPEC.md §5.3), and the two app-wide side-effect mounts — ClientErrorMonitor (I9) and the
 // navigation progress bar (I8). No page/feature content lives here — real pages start at M4.
 import {

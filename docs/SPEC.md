@@ -243,8 +243,8 @@ and 10 consecutive invalid lines (default) auto-disables the source and raises a
 | POST | `/api/alert-rules` | session | `{source_id, target_name, condition, threshold, debounce_seconds, notify_channel_id}` |
 | PATCH | `/api/alert-rules/{id}` | session | update/enable/disable a rule |
 | DELETE | `/api/alert-rules/{id}` | session | remove a rule |
-| GET | `/api/notification-channels` | session | list of configured channels (never returns `secret_ref` value) |
-| POST | `/api/notification-channels` | session | `{type: "telegram", config: {chat_id}, bot_token}` → stores `bot_token` via the §3 secrets mechanism, returns channel with `secret_ref` |
+| GET | `/api/notification-channels` | session | list of configured channels as `{id, type, chat_id, enabled}`; never returns a token or secret reference |
+| POST | `/api/notification-channels` | session | `{type: "telegram", chat_id, bot_token}` → stores `bot_token` via the §3 secrets mechanism and returns `{id, type, chat_id, enabled}` |
 | PATCH | `/api/notification-channels/{id}` | session | update config / enable / disable / rotate token |
 | DELETE | `/api/notification-channels/{id}` | session | remove a channel (blocked if an enabled `alert_rules` row still references it) |
 | POST | `/api/auth/login` | none (this *is* the login) | admin password → session cookie |
@@ -292,7 +292,7 @@ underlying host/IP changes later.
 ### 5.3 Design System
 
 No screenshots or existing brand exist for this project — direction below was derived via the
-`frontend-design` skill from the domain, audience, and the architect's stated preferences
+`impeccable` skill from the domain, audience, and the architect's stated preferences
 (clean/modern SaaS tone, dark-mode default, compact/dense information layout, no brand
 constraints, standard WCAG 2.2 AA).
 
@@ -347,9 +347,10 @@ in the active change file, not a rewrite of this section.
 
 ## 6. Auth & Access Model
 
-**v1 decision: single admin password, no multi-user.** On first run, the core generates or accepts
-an admin password and stores its bcrypt hash in `secrets.enc.json` (same encrypted-file mechanism
-used for adapter secrets, §3). Login issues an `HttpOnly`, `Secure`-when-HTTPS session cookie.
+**v1 decision: single admin password, no multi-user.** On first run without a stored hash, the core
+generates an admin password and stores its bcrypt hash in `secrets.enc.json` (same encrypted-file
+mechanism used for adapter secrets, §3). Later starts reuse that hash. Login issues an `HttpOnly`,
+`Secure`-when-HTTPS session cookie.
 Every REST/WS endpoint except `/api/auth/login` and a health-check endpoint requires a valid
 session.
 
@@ -432,7 +433,7 @@ claim that an artifact was published or a management host was deployed.
 | `M3` | complete | `uptime-http` adapter (+ TLS expiry) | Concurrent adapters without a contract change |
 | `M4` | complete | Minimal UI | Sources, Dashboard, Source detail, WS updates and manifest-backed source form |
 | `M5` | complete | Alert router + Telegram channel | Firing/resolved alert lifecycle and notification-channel management |
-| `M6` | in progress | Dogfooding on infraegev2 | Six production adapters and Sources are reconciled; Change 20 proves fresh polling, quiet success, reversible failure/recovery and authenticated UI rendering. The longer evidence window remains active before the v2 backlog is selected |
+| `M6` | in progress | Dogfooding on infraegev2 | Six production adapters and Sources are reconciled; Change 20 proves fresh polling, quiet success, reversible failure/recovery and authenticated UI rendering. The longer evidence window is paused while the workstation core is off and resumes only with explicit runtime ownership |
 | `M7` | partial | Dogfood extensions | `fail2ban-ssh`, `journal-http`, `beszel-api` and `umami-http` shipped; Docker adapter and second channel are not approved merely because the old row mentioned them |
 | `M8` | retired | Host/provisioner prototype | Write-capable deployment was separated from the trust domain and removed from runtime by Change 15; inert migration data remains |
 | `M9` | planned | Projects and generic push ingress | Multiple applications grouped without adapter-specific UI; authenticated Metric/Check/Event ingress |
@@ -445,7 +446,7 @@ claim that an artifact was published or a management host was deployed.
 |-------|-------|---------------|
 | `0` | Complete documentation Change 19 with linked infraegev2 Change 44 | Complete: six template configs remain manifest-valid; the stale local state and ownership boundaries were recorded without secrets or runtime mutation |
 | `1` | Reconcile the six infraegev2 Sources in Change 20 and run a bounded soak | Complete: all six Sources have repeated fresh `ok` outcomes; quiet success, reversible failure/recovery and authenticated browser rendering are proven without target-side mutation |
-| `2` | Continue the bounded M6 dogfood evidence window | Observe real operating behavior long enough to rank recurring gaps; keep admin recovery and newly reproduced defects explicit instead of expanding M9 from a single-session snapshot |
+| `2` | Resume the bounded M6 dogfood evidence window | First add a supported owner-only admin password rotation/recovery command, then resume the core under explicit runtime ownership and observe real behavior long enough to rank recurring gaps; do not expand M9 from a single-session snapshot |
 | `3` | Select the smallest M9 slice from accumulated dogfood evidence | One project boundary and authenticated push journey are specified end to end; no target mutation or deploy credentials enter sre-kit |
 | `4` | Harden M10 before accepting external adapters | Manifest versioning, conformance and sandbox/trust decisions have executable acceptance evidence |
 | `5` | Build M11 distribution | One reproducible artifact includes API, web and adapters; local install plus the architect-selected always-on path prove backup, restore, upgrade and exact-version health |

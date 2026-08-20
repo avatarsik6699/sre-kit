@@ -1,4 +1,4 @@
-// Router configuration (docs/changes/01-core-skeleton.md I10): wires TanStack Router's
+// Router configuration (docs/changes/archive/01-core-skeleton.md I10): wires TanStack Router's
 // pending/error/not-found defaults to shared/components/route-state (I8), and layers TanStack
 // Query over the router per docs/SPEC.md §5.2's WS-push cache model (query-client.ts, I6).
 import { QueryClientProvider } from "@tanstack/react-query";
