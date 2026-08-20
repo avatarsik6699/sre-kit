@@ -78,8 +78,8 @@ task — it's expensive by design; that's why it's separated from the Fast Gate.
 | Frontend install | `pnpm --dir web install --frozen-lockfile` | pnpm 10.33.0, Node.js 24 |
 | API contract drift | `go install github.com/swaggo/swag/cmd/swag@v1.16.6 && PATH="$PWD/web/node_modules/.bin:$PATH" node scripts/api-contracts.mjs --check` | Requires the preceding frontend install |
 | Frontend lint | `pnpm --dir web lint` | |
-| Frontend type-check | `pnpm --dir web typecheck` | |
-| Frontend build | `pnpm --dir web build` | |
+| Frontend build / route generation | `pnpm --dir web build` | Must precede type-check in a clean checkout because `routeTree.gen.ts` is generated and ignored |
+| Frontend type-check | `pnpm --dir web typecheck` | Requires the preceding build-generated route tree |
 | Frontend unit tests | `pnpm --dir web test` | |
 | E2E lint / determinism | `n/a` | no e2e suite yet |
 | E2E (Playwright) | `n/a` | no e2e suite yet |
