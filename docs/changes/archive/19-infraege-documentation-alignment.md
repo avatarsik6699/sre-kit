@@ -7,7 +7,7 @@
 | Change | `19` |
 | Slug | `infraege-documentation-alignment` |
 | Title | infraege Documentation Alignment |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/19-infraege-documentation-alignment` |
 
 ---
