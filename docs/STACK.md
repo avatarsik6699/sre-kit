@@ -22,7 +22,7 @@
 | Cache | — (no separate cache layer; batched direct writes to SQLite) |
 | Infra | Current Docker image contains the Go API and adapters; web is built separately. Combined local/management-VPS distribution is deferred to M11. `infraegev2` is the first dogfood integration and owns its own target automation |
 | Package managers | Go modules (backend), `pnpm` (frontend) |
-| CI | — (not yet configured) |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) on pull requests and pushes to `main` |
 
 ---
 
@@ -55,9 +55,9 @@ not the full suite. Fill every row that applies; mark `n/a` for rows that don't 
 
 | Check | Command | Preconditions / notes |
 |-------|---------|-----------------------|
-| Lint | `golangci-lint run` (backend) / `eslint .` (frontend) | |
-| Type-check (affected) | `tsc --noEmit` | frontend only; Go is statically checked at build |
-| Targeted / affected unit tests | `go test ./... -short` (backend) / `pnpm vitest related` (frontend) | |
+| Lint | `test -z "$(find cmd internal adapters -type f -name '*.go' -print0 \| xargs -0 gofmt -l)" && go vet ./...` (backend) / `pnpm --dir web lint` (frontend) | Native Go checks avoid a machine-local linter dependency |
+| Type-check (affected) | `pnpm --dir web typecheck` | frontend only; Go is statically checked by `go vet`/tests |
+| Targeted / affected unit tests | `go test ./... -short` (backend) / `pnpm --dir web vitest related` (frontend) | |
 | LSP diagnostics | `no — not yet available, add gopls for Go` | informational — enforced via Required Tooling, not a shell command |
 | API type regen (`openapi-typescript` or equivalent) | `node scripts/api-contracts.mjs` (regen) / `node scripts/api-contracts.mjs --check` (drift check) | run when the API surface changed — see § API contract generation |
 
@@ -70,14 +70,20 @@ task — it's expensive by design; that's why it's separated from the Fast Gate.
 
 | Check | Command | Preconditions / notes |
 |-------|---------|-----------------------|
-| Infrastructure / bootstrap | `[command to start services]` | [e.g. needs `.env`, all services healthy] |
+| Infrastructure / bootstrap | `n/a` | Source-quality gate; self-contained runtime distribution is deferred to M11 |
 | Migrations | `n/a` | SQLite schema managed inline; revisit if a migration tool is adopted |
+| Backend formatting / static analysis | `test -z "$(find cmd internal adapters -type f -name '*.go' -print0 \| xargs -0 gofmt -l)" && go vet ./...` | Must produce no unformatted files or vet findings |
+| Go module integrity | `go mod verify` | |
 | Backend test suite | `go test ./...` | |
-| Frontend build | `pnpm build` | |
-| Frontend unit tests | `pnpm vitest run` | |
+| Frontend install | `pnpm --dir web install --frozen-lockfile` | pnpm 10.33.0, Node.js 24 |
+| API contract drift | `go install github.com/swaggo/swag/cmd/swag@v1.16.6 && PATH="$PWD/web/node_modules/.bin:$PATH" node scripts/api-contracts.mjs --check` | Requires the preceding frontend install |
+| Frontend lint | `pnpm --dir web lint` | |
+| Frontend type-check | `pnpm --dir web typecheck` | |
+| Frontend build | `pnpm --dir web build` | |
+| Frontend unit tests | `pnpm --dir web test` | |
 | E2E lint / determinism | `n/a` | no e2e suite yet |
 | E2E (Playwright) | `n/a` | no e2e suite yet |
-| Smoke | `[command]` | [change files may override] |
+| Smoke | `go build ./...` | Source/build smoke only until M11 defines the packaged runtime |
 | SAST (e.g. Semgrep) | `n/a` | not set up yet |
 | Secrets scan (e.g. Gitleaks) | `n/a` | not set up yet |
 | Dependency audit (e.g. Trivy / `npm audit` / `pip-audit`) | `n/a` | not set up yet |
@@ -100,8 +106,13 @@ before pushing to `origin/main`.
 | Check | Command | Preconditions / notes |
 |-------|---------|-----------------------|
 | Container image scan (e.g. Trivy) | `n/a` | not set up yet |
-| Health-check / zero-downtime deploy verification | `n/a` | not set up yet |
-| `gh` authenticated for this repo | `no` | not yet configured |
+| Published artifact / deploy verification | `n/a` | Deferred to M11; a green CI run is not a deployed release |
+| `gh` authenticated for this repo | `gh auth status` | Required before pushing |
+
+After the Release Gate passes and `main` is pushed, the ship playbook's mandatory deployment-status
+step is an exact-commit CI check (not a deployment claim): locate the `ci.yml` run whose
+`headSha` equals `git rev-parse main`, then run `gh run watch <database-id> --exit-status` and
+confirm the completed run still reports that SHA via `gh run view`.
 
 ---
 

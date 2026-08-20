@@ -396,9 +396,11 @@ duplicate.
 Deploy shape: one self-contained release (Docker container or plain binary + web assets and
 adapters) — matches the "run locally now, self-host on a management VPS later" trajectory. The
 release must not assume that sre-kit and monitored targets share a filesystem, Docker network or
-loopback interface. No CI pipeline is configured yet (see
-`docs/STACK.md` Full/Release Gate — rows are `n/a` pending tooling setup). `/ship --release`'s
-deploy verification step is not yet defined; this is an open item (§11).
+loopback interface. GitHub Actions validates the Go core and adapters, generated API contract, and
+web client for pull requests and every push to `main`; the commands and exact-commit release check
+are defined in `docs/STACK.md`. Until M11 ships a self-contained artifact, `/ship --release`
+publishes source changes and requires a green CI run for the exact pushed commit, but does not
+claim that an artifact was published or a management host was deployed.
 
 ---
 
@@ -458,11 +460,10 @@ deploy verification step is not yet defined; this is an open item (§11).
 
 ## 11. Open Questions
 
-- **Deploy/release verification target** — `docs/STACK.md`'s Release Gate (container scan,
-  health-check verification, `gh` auth) is currently all `n/a`/`no`; needs concrete commands before
-  `/ship --release` can be used meaningfully. `[NEEDS_CLARIFICATION: what does "deploy verified"
-  mean for a self-hosted single-binary/container target — a manual VPS step, or something
-  scriptable?]`
+- **M11 deploy verification target** — source publication is currently verified by an exact-commit
+  green GitHub Actions run. M11 must separately choose and verify the self-contained artifact and
+  management-host deployment path; CI success must not be reported as a deployed release.
+  `[NEEDS_CLARIFICATION: should M11 verify a local install, a dedicated management VPS, or both?]`
 - **Adapter sandboxing** — accepted as a known v1 compromise (adapters run as unsandboxed
   subprocesses with secret access via env/stdin). Explicitly deferred, not blocking, but flagged
   here so it isn't silently forgotten once third-party adapters become a possibility (v2+).
