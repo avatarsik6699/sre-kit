@@ -9,8 +9,8 @@
 
 | Field | Value |
 |-------|-------|
-| Document Version | `v1.0` |
-| Date | `2026-08-13` |
+| Document Version | `v1.1` |
+| Date | `2026-08-20` |
 | Architect / Owner | `avatarsik666@gmail.com` |
 | Stack | See [docs/STACK.md](./STACK.md) |
 | Domain | Self-hosted SRE/observability aggregator for solo developers and small teams |
@@ -43,11 +43,16 @@ Success metrics for v1:
 - 2–4 weeks of dogfooding on the architect's own VPS produces a concrete v2 backlog rather than
   uncovering v1-blocking gaps.
 
+**Product direction (post-MVP):** sre-kit remains an observability data plane and read-only
+management UI. It may run on the operator's workstation or on a dedicated management VPS and
+connect to many unrelated applications through adapters. Installation, deployment, rollback and
+backup of monitored tools belong to each target application's operations layer, not to sre-kit.
+
 ### 1.3 Project Boundaries
 
 | Included (v1) | Excluded (v1) |
 |----------|----------|
-| Unified data contract: Metric, Check, Event, Alert | `Action` primitive (reverse commands — unban IP, restart container) — reserved for v2/v3, see §2.2 |
+| Unified data contract: Metric, Check, Event, Alert | Remote actions, deployment, rollback or configuration mutation |
 | `host-metrics-ssh` adapter (CPU/RAM/disk/network via SSH) | Docker container adapter |
 | `uptime-http` adapter (HTTP/TCP check + TLS expiry) | Backup / dead-man-switch adapter |
 | `fail2ban-ssh` adapter (optional, time-permitting) | |
@@ -58,15 +63,14 @@ Success metrics for v1:
 | Alert rules with single Telegram notification channel | Escalation / repeat notifications on unresolved alerts |
 | Single admin-password auth | OAuth / full user management |
 | Pagination / retention policy tooling beyond simple TTL deletion | Downsampling / rollup usage (schema reserved, not active) |
-| `Host` entity + observability auto-provisioning (Beszel, Umami presets) — added post-M6, see §12 | Multi-tool bundle presets, fleet auto-onboarding / agent-push model, non-Linux / non-SSH / non-Docker provisioning targets (PaaS, Kubernetes, bare-metal without SSH, Windows) — see §12.5 |
+| Adapter-driven pull/stream inputs; generic authenticated push input is the next extension (§9) | Tool installers, Docker Compose presets and target-host credential management |
 
 **First-party reference deployment.** `infraegev2` is a sibling repository owned by the same
-architect, not an external customer integration. `sre-kit` owns the observability core, adapters,
-source configuration, presets and deployment automation for observability components. infraegev2
-owns application telemetry emission, its VPS access and network prerequisites, and its application
-Compose topology until a coordinated change explicitly moves a component. Any task that changes
-both sides must have linked active Backlog items in both repositories; the removed infraegev2
-`apps/ops` dashboard is not restored as a second observability product.
+architect, not an external customer integration. `sre-kit` owns the observability core, adapter
+contracts, source configuration, normalization, alerting and monitoring UI. infraegev2 owns its
+application telemetry plus the installation and lifecycle of observability components on its VPS.
+The two repositories integrate only through versioned source-registration and telemetry-ingestion
+contracts. Neither repository imports the other's internal code or assumes its filesystem layout.
 
 ---
 
@@ -95,15 +99,10 @@ UI, or alerting — none of those layers know adapter-specific detail:
 - **Event** — a discrete log/occurrence (`{timestamp, level, message, labels}`), e.g. a fail2ban ban.
 - **Alert** — derived by the core's Alert router from rules applied to Metric/Check/Event; has a
   full firing → resolved lifecycle (§10.7 semantics captured in §6 below).
-- **Action** *(reserved, not implemented in v1)* — a future fifth primitive for reverse commands
-  (unban an IP, restart a container). The contract must stay additive-only so this can be added in
-  v2/v3 without a breaking change (see `contract.schema.json` versioning rule in §4).
-- **Host** *(added post-M6, see §12)* — an SSH-reachable machine sre-kit is authorized to deploy
-  Docker-based observability tools to. Deliberately **not** part of the `Source → Alert` telemetry
-  chain above: a Host is infrastructure the provisioner mutates (deploys containers, creates admin
-  accounts); a Source stays the existing read-only monitoring projection. A `Source` produced by
-  provisioning carries a nullable `host_id` for traceability only — nothing about how the 6
-  pre-existing adapters or the telemetry chain works changes.
+
+Remote actions are deliberately not a fifth core entity. An external operations tool may report
+its run as ordinary `Check` and `Event` records, but sre-kit never interprets those records as
+authorization to mutate the target.
 
 ---
 
@@ -187,42 +186,12 @@ CREATE TABLE metrics_rollup (
   agg_json TEXT                  -- min/max/avg/count for the bucket
 );
 
--- Added post-M6 — see §12. Independent of the telemetry chain above; owned by internal/hosts.
-CREATE TABLE hosts (
-  id TEXT PRIMARY KEY,           -- UUID generated by the core, same rationale as sources.id
-  label TEXT,
-  address TEXT,                  -- hostname or IP, SSH target
-  ssh_port INTEGER DEFAULT 22,
-  ssh_user TEXT,
-  ssh_key_secret_ref TEXT,       -- user-pasted private key, via the §3 secrets.enc.json mechanism
-  host_key_fingerprint TEXT,     -- pinned on first successful connect — see §12.4
-  docker_available BOOLEAN,
-  last_connected_at DATETIME,
-  last_status TEXT,              -- 'ok' | 'unreachable' | 'error' — same vocabulary as sources.last_status
-  created_at DATETIME
-);
-
--- sources.host_id is nullable and additive-only: NULL for every pre-existing source, set only when
--- a source is produced by the provisioner (see §12).
-ALTER TABLE sources ADD COLUMN host_id TEXT;
-
--- Added post-M6 — see §12. Owned by internal/provisioner. A workflow/job record, not a CRUD entity
--- like hosts/sources — deliberately separate so retrying a failed deploy can resume from `step`
--- instead of re-running the whole workflow.
-CREATE TABLE provisioning_runs (
-  id TEXT PRIMARY KEY,
-  host_id TEXT,                  -- FK -> hosts.id
-  preset_name TEXT,              -- 'beszel' | 'umami' in v1
-  status TEXT,                   -- 'pending' | 'deploying' | 'bootstrapping' | 'registering' | 'done' | 'failed'
-  step TEXT,                     -- last completed/attempted step name, so a retry resumes rather than restarts
-  error_message TEXT,
-  admin_password_secret_ref TEXT, -- set once bootstrap succeeds, so a retried registration reuses
-                                   -- the credential actually set on the tool rather than generating a new one
-  produced_source_id TEXT,       -- FK -> sources.id, set once registration succeeds
-  started_at DATETIME,
-  finished_at DATETIME
-);
 ```
+
+Databases upgraded through the retired provisioning prototype may additionally contain `hosts`,
+`provisioning_runs` and nullable `sources.host_id` from migration `0003`. They are inert legacy
+storage: current code does not read, write or expose them. Change 15 preserves them to avoid
+destructive cleanup; a later explicit migration may remove them only after an operator inventory.
 
 Secrets (SSH keys, third-party API tokens) are **not** stored in SQLite. They live in a separate
 `secrets.enc.json`, symmetrically encrypted with a key from an environment variable or a
@@ -278,14 +247,6 @@ log, and 10 consecutive invalid lines (default) auto-disables the source and rai
 | POST | `/api/webhooks/:source_id` | source-scoped token | push-mode adapter data (dead-man-switch style) |
 | WS | `/api/stream` | session | live pub/sub feed of new Metric/Check/Event/Alert, filtered by subscribed `source_id`s |
 | GET | `/api/adapters` | session | installed adapters + their manifests |
-| GET | `/api/hosts` | session | list of hosts + connection/status (added post-M6, see §12) |
-| POST | `/api/hosts` | session | `{label, address, ssh_port, ssh_user, ssh_key}` → creates a host; `ssh_key` stored via the §3 secrets mechanism, response never returns it |
-| POST | `/api/hosts/:id/check-connection` | session | dials SSH, pins `host_key_fingerprint` on first success (fails loudly on later mismatch, see §12.4), probes `docker compose version`, updates `last_status`/`docker_available` |
-| DELETE | `/api/hosts/:id` | session | remove a host (blocked if an active `provisioning_runs` row references it) |
-| GET | `/api/presets` | session | installed presets (`presets/*/manifest.json`) — v1: `beszel`, `umami` |
-| POST | `/api/hosts/:id/provision` | session | `{preset_name}` → creates a `provisioning_runs` row and starts the workflow (deploy → bootstrap → register, see §12.2) |
-| GET | `/api/provisioning-runs?host=` | session | list of provisioning runs, for polling status |
-| POST | `/api/provisioning-runs/:id/retry` | session | resumes a `failed` run from its last completed `step`, per §12.4's idempotency requirement |
 
 Adapter execution modes:
 - **Pull** (default) — Scheduler runs the subprocess on a per-source interval; non-zero exit or
@@ -311,7 +272,6 @@ underlying host/IP changes later.
 | Source detail | `/sources/:id` | Live metric chart (with 24h/7d historical toggle) + live event feed for one source |
 | Notifications | `/notifications` | Configure notification channels (Telegram v1) and alert rules |
 | Add source | drawer over `/sources` | Schema-driven form generated from the chosen adapter's `manifest.json` `config_schema`, with a test-connection step before saving |
-| Hosts | `/hosts` | Added post-M6 (§12): list of hosts, connection status, add/remove; a "Deploy" action per host opens the preset picker and shows live `provisioning_runs` progress |
 | Login | `/login` | Single admin-password form |
 
 ### 5.2 Components / Stores
@@ -413,15 +373,14 @@ human.
 ### 7.1 Infrastructure
 
 See [docs/STACK.md](./STACK.md) for concrete commands and tooling. Summary: Go backend (single
-static binary, `x/crypto/ssh`), SQLite storage, React + TanStack Start + Mantine UI v9+ frontend,
+static binary), SQLite storage, React + TanStack Start + Mantine UI v9+ frontend,
 NDJSON-over-stdio adapter protocol (language-agnostic, easy to debug by hand:
 `echo config | ./adapter`).
 
-The first-party infraegev2 installation is the reference dogfood target for this infrastructure.
-Reusable collectors and observability deployment logic belong here; application-specific
-instrumentation, public routing and VPS prerequisites stay in infraegev2. A live-only source or
-deployment adjustment is incomplete until the owning repository contract is updated through its
-SDD workflow.
+infraegev2 is the first dogfood integration, not the reference filesystem or deployment shape.
+Its operations layer installs and maintains target-side tools; sre-kit connects through adapters
+and versioned ingestion contracts. A cross-repository change is complete only when both owning
+contracts are updated through their SDD workflows.
 
 **Architectural style**: the Go backend follows a modular DDD-like layout (bounded-context
 packages under `internal/`, each split into `domain`/`application`/`infrastructure`/`interfaces`,
@@ -434,8 +393,10 @@ duplicate.
 
 ### 7.2 Deploy / CI
 
-Target deploy shape: one Docker container (or a plain binary + systemd unit) — matches the
-"run locally now, self-host on a VPS later" trajectory. No CI pipeline is configured yet (see
+Deploy shape: one self-contained release (Docker container or plain binary + web assets and
+adapters) — matches the "run locally now, self-host on a management VPS later" trajectory. The
+release must not assume that sre-kit and monitored targets share a filesystem, Docker network or
+loopback interface. No CI pipeline is configured yet (see
 `docs/STACK.md` Full/Release Gate — rows are `n/a` pending tooling setup). `/ship --release`'s
 deploy verification step is not yet defined; this is an open item (§11).
 
@@ -448,7 +409,7 @@ deploy verification step is not yet defined; this is an open item (§11).
 | Security headers / CORS | Single-origin app (UI served by the same Go binary as the API) — no cross-origin API access in v1, so CORS is `n/a` by design; standard security headers (`X-Content-Type-Options`, `X-Frame-Options`, HSTS when served over TLS) still apply |
 | Accessibility target | WCAG 2.2 AA (see §5.3) |
 | Performance budget | Not a marketing/content site — budget expressed as live-update latency instead: new data visible in the UI within a few seconds of an adapter emitting it (§4 WS push design), not classic LCP/INP/CLS thresholds |
-| Observability | Per-source adapter error log (§4); `unreachable`/`error` status distinction (§6) is the primary operational signal; no separate metrics/tracing system for the core itself in v1 |
+| Observability | Per-source adapter error log (§4) and the `unreachable`/`error` status distinction (§6) are the primary operational signals; no separate metrics/tracing system for the core itself in v1 |
 | Backup / restore | Back up `sqlite` DB file + `secrets.enc.json` separately (the split exists specifically so the DB can be freely copied without leaking credentials, §3); no automated backup adapter in v1 (explicitly out of scope, §1.3) |
 | Other (compliance, SLOs) | n/a — single-user self-hosted tool, no compliance targets for v1 |
 
@@ -466,7 +427,10 @@ deploy verification step is not yet defined; this is an open item (§11).
 | `M5` | Alert router + Telegram channel | A real alert fires when a test service goes down |
 | `M6` | Dogfooding (2–4 weeks on the architect's own VPS) | Concrete, prioritized v2 backlog |
 | `M7` (v2, post-review) | `fail2ban-ssh` adapter, Docker adapter, second notification channel | Scoped from dogfooding findings |
-| `M8` (post-M6) | Observability Auto-Provisioning (§12): `Host` entity, `internal/provisioner`, Beszel + Umami presets | One-click deploy on a real VPS produces a working `sources` row with zero manual account setup, for both presets |
+| `M8` (retired experiment) | Host/provisioner prototype | Validated that write-capable deployment is a separate trust domain; removed from the product by Change 15 |
+| `M9` | Projects and generic push ingress | Multiple applications are grouped without adapter-specific UI; external tools can submit authenticated Metric/Check/Event records |
+| `M10` | Adapter extensibility | Versioned manifest capabilities, conformance harness and contributor contract for third-party adapters |
+| `M11` | Core distribution | Reproducible release artifact with UI/adapters, backup/restore and verified local plus always-on management-host deployment paths |
 
 ---
 
@@ -477,26 +441,18 @@ deploy verification step is not yet defined; this is an open item (§11).
 - A from-scratch metrics collector — only adapters to existing tools/protocols.
 - A plugin marketplace/registry — local adapter folder only.
 - Multi-tenant / RBAC — single user, single instance, for v1.
-- The `Action` primitive (reverse commands: unban IP, restart container, etc.) — reserved for
-  v2/v3; the contract must stay additive-only so adding it later isn't a breaking change.
+- Remote actions and deployment primitives. External operations tools may report their outcomes as
+  telemetry, but core records never authorize a target mutation.
 - Docker-container adapter, backup/dead-man-switch adapter — second iteration, after the contract
   is proven on the first 2–3 adapters. (The web-analytics adapter this list originally deferred
   alongside them shipped as `umami-http` in change-11, once that condition was met — see §1.3.)
 - Pagination/retention policy tooling beyond simple TTL deletion.
 - Escalation/repeat notifications for unresolved alerts.
 - Adapter sandboxing — accepted risk while all adapters are first-party (see §11).
-- Strict SSH host-key verification — accepted trust-on-first-connect (TOFU) risk for a
-  single-user tool adding its own servers (see §11) for the two existing SSH adapters specifically;
-  the provisioner (§12) does **not** get this exemption — see §12.4.
-- Multi-tool bundle presets (deploy Beszel + Umami as one unit) — deferred until two independent
-  single-tool presets are proven, per this project's own "prove it twice before generalizing"
-  pattern (already used once for the adapter contract itself, see the `umami-http` note above).
-- Fleet auto-onboarding / agent-push provisioning model (one deployed stack auto-monitoring N
-  additional hosts) — no driving need yet; the current design targets 1–2 hosts (§12.5).
-- Any provisioning target that isn't an SSH-reachable Linux host with Docker — PaaS/serverless,
-  Kubernetes clusters, bare-metal without SSH access, Windows hosts (§12.5). These need a different
-  integration primitive entirely (adapter-style API integration, or Helm/kubeconfig-based deploy),
-  not a generalization of the SSH+Docker-Compose provisioner.
+- Strict SSH host-key verification — accepted trust-on-first-connect (TOFU) risk for the existing
+  read-only SSH adapters only; deployment credentials are never stored by sre-kit.
+- Tool installers, Docker Compose presets, fleet bootstrap and application-specific backup or
+  rollback. These belong to target-owned operations repositories regardless of platform.
 
 ---
 
@@ -513,114 +469,24 @@ deploy verification step is not yet defined; this is an open item (§11).
   `[NEEDS_CLARIFICATION: revisit before any third-party adapter is accepted]`
 - **SSH host-key verification** — TOFU accepted for v1 as a single-user convenience trade-off;
   same treatment as above, revisit if the trust model changes (e.g. shared/team use).
-- **Umami's non-interactive bootstrap path** — the §12.3 `umami` preset design assumes a *freshly
-  deployed* Umami container seeds a known default admin account, and that Umami exposes a
-  self-service "change my own password" endpoint for a logged-in user. Neither is yet confirmed
-  against the real image. `[NEEDS_CLARIFICATION: verify Umami's default seed credentials and
-  self-service change-password endpoint against the real container before building the `umami`
-  preset's bootstrap step — do this as an early Backlog item, since the whole preset design leans
-  on it holding; if it doesn't hold, the bootstrap step needs a different mechanism, e.g. driving
-  Umami's web UI headlessly.]`
-- **User-supplied SSH keys for provisioning** — §12.1 stores whatever private key the user pastes
-  into the Host form, rather than sre-kit generating a dedicated keypair. Accepted trade-off
-  (simpler setup UX now), but it means a `secrets.enc.json` compromise can expose a key the user
-  may have reused elsewhere, not just a key scoped to sre-kit. `[NEEDS_CLARIFICATION: revisit if
-  reused-key blast radius becomes a real incident, or offer dedicated-keypair generation as an
-  alternative Host setup path in a later iteration.]`
 
 ---
 
-## 12. Observability Auto-Provisioning
+## 12. Extension and Operations Boundary
 
-Added post-M6. sre-kit's existing adapters only *read* from tools the user already installed and
-configured by hand — shipping `journal-http`/`beszel-api`/`umami-http` each required a manual,
-sometimes painful, SSH/CLI/DB detour before the adapter could even be added (change-08 through
-change-11). This section lets sre-kit deploy an observability tool itself: give it SSH access to a
-host, and it deploys the tool as an independent Docker Compose stack, creates its admin account, and
-registers the result as a `sources` row — through the sre-kit UI, under the single admin login,
-with no other account the user has to touch directly.
+sre-kit's extension surface is observational:
 
-### 12.1 Host
+- pull and stream adapters read existing tools and protocols;
+- the M9 push receiver accepts authenticated Metric/Check/Event records from external producers;
+- every input is normalized through the same Source-scoped validation, storage, alerting and UI
+  pipeline;
+- adapter-specific configuration remains at the transport edge.
 
-A `Host` (§2.2, `hosts` table in §3) is an SSH-reachable Linux machine with Docker that sre-kit is
-authorized to deploy to — independent of any monitored application: it may be the same VPS the
-user's app runs on, or a separate VPS, by design (§1.1's "bolt-on layer" requirement). The user
-pastes an existing private key into the Host setup form; it is stored via the same `secret_ref`
-mechanism as every other adapter secret (§3) — no new secrets mechanism. The setup form must state
-plainly, before the key is submitted, that the account needs Docker access on the target machine,
-which is root-equivalent (mirrors the existing "deployment guidance, not enforced in code" language
-in §6).
+Installation and lifecycle automation is explicitly external. A target-owned tool may use SSH,
+Docker Compose, systemd, Kubernetes or a provider API, but those credentials, plans, runs and
+rollback state never become sre-kit entities. The tool integrates by idempotently registering
+Sources and emitting sanitized operational Checks/Events. sre-kit being unavailable must not block
+the external operation; delayed telemetry may be delivered after connectivity returns.
 
-### 12.2 Provisioning workflow
-
-`internal/provisioner` (new bounded context, same `domain/application/infrastructure/interfaces`
-layering as every other context, wired only via ports in `cmd/server/main.go`) runs a `Host` +
-`preset_name` → `provisioning_runs` row (§3) through: render the preset's `docker-compose.yml`
-template → SSH-upload → `docker compose up -d` → poll for healthy → run the preset's bootstrap step
-→ `secrets.Store.Put` the generated admin password → call the existing
-`sources/application.Service.Create` directly (the same use case the "Add source" UI form already
-calls) to register the result. `provisioning_runs.step` records the last completed step so a failed
-run (§12.4) can retry by resuming, not restarting.
-
-This is deliberately **not** built on the adapter/manifest/scheduler mechanism (§4): the adapter
-contract's entire trust model assumes adapters observe and never mutate remote state (non-zero exit
-just means "unreachable"). Reusing it for a write-capable, credential-generating workflow would
-silently widen that trust boundary for every adapter, present and future. The provisioner is the
-first core-side (not adapter-subprocess-side) user of `golang.org/x/crypto/ssh`, scoped to a narrow
-port (`RunCommand`, `UploadFile`) inside `internal/provisioner/infrastructure` only.
-
-### 12.3 Presets
-
-A preset (`presets/<name>/`, sibling to `adapters/`) declares a `manifest.json`
-(`produces_adapter`, `produces_source_config_template`), a `docker-compose.yml.tmpl`, and a
-`bootstrap.json` describing how to create the tool's first admin account. v1 ships exactly two:
-
-- **`beszel`** — bootstrap is one SSH-run CLI command (`beszel superuser upsert <email>
-  <password>`), proven manually against the real infraegev2 VPS during change-09/10.
-- **`umami`** — the provisioner always deploys a *fresh* container, so bootstrap is "log in with
-  Umami's seeded default admin account, call its self-service change-password endpoint" — an HTTP
-  call sequence, not a DB mutation (this is what makes Umami tractable here, unlike the abandoned
-  Postgres-password-reset attempt against an *existing* install in change-11). The exact default
-  credentials and endpoint are `[NEEDS_CLARIFICATION]`, see §11 — verify against the real image
-  early in implementation.
-
-Because these two presets have materially different bootstrap shapes (one SSH command vs. an HTTP
-call sequence), `bootstrap.json` supports both step types from the start rather than being modeled
-on only one. `produces_source_config_template` renders straight into a `sources.Create` call using
-the target adapter's existing `config_schema` (`adapters/beszel-api/manifest.json`,
-`adapters/umami-http/manifest.json`) — no parallel source-creation path.
-
-### 12.4 Security disclosures
-
-Named explicitly here, the same way TOFU is named in §10/§11, not silently shipped:
-
-- **Host-key verification must be real for this path**, unlike the TOFU exemption the two existing
-  read-only SSH adapters keep (§10/§11). A MITM'd provisioning session can capture generated admin
-  credentials or mask a hijacked deploy behind a fake "success." The provisioner pins
-  `host_key_fingerprint` (§3) on first successful connect (`golang.org/x/crypto/ssh/knownhosts`)
-  and refuses a silently-changed key on every connection after.
-- **`secrets.enc.json` compromise now unlocks deploy capability, not just read access** — and,
-  because Host setup accepts a user-pasted (possibly reused) key rather than a dedicated
-  sre-kit-generated one (§12.1, §11), this blast radius is larger than it would otherwise be. This
-  is an accepted v1 trade-off for simpler setup UX, tracked in §11.
-- **Docker access on the target host is root-equivalent** — disclosed in the Host setup UI itself
-  (§12.1), not just in this document.
-- **Partial-failure handling is a correctness requirement.** `docker compose up -d` is naturally
-  idempotent, so a retry after a deploy-step failure is safe by construction; the bootstrap step
-  for both presets needs an explicit "does this instance already have an admin account" check
-  before (re-)running, so a retry after a bootstrap-step failure doesn't create a second account.
-
-### 12.5 Topology boundaries
-
-The design targets exactly "one SSH-reachable Linux host with Docker" as the deploy unit. Already
-covered with zero changes: stack co-located with the monitored app, or on a separate VPS (§12.1).
-The current infraegev2 deployment is a first-party co-located instance, but its existing Beszel and
-Umami services remain application-Compose-owned until a separate coordinated migration proves
-state preservation, rollback and source continuity. This ownership rule does not by itself trigger
-that migration.
-Partially covered, explicitly deferred (§10): a shared stack auto-onboarding multiple additional
-monitored hosts — would eventually need an agent-push model instead of pure SSH-pull provisioning,
-not built in v1. Out of shape for this mechanism entirely, not a gap to close later (§10): PaaS /
-serverless targets, Kubernetes clusters, bare-metal without SSH access, Windows hosts — each would
-need a different integration primitive (adapter-style API integration, or Helm/kubeconfig-based
-deploy) rather than a generalization of SSH + Docker Compose.
+The boundary keeps infraegev2 useful as dogfood without making its repository layout, Compose
+services, VPS topology or deployment workflow part of the open-source core.

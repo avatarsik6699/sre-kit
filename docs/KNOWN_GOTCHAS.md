@@ -13,15 +13,25 @@
 
 ### Cross-repository observability changes can leave a live-only contract
 
-- **Symptoms**: infraegev2 monitoring works after a manual source/database adjustment, but sre-kit
-  docs or deployment automation still describe the previous access/topology; later agents treat
-  sre-kit as an external consumer or try to revive infraegev2 `apps/ops`.
+- **Symptoms**: infraegev2 monitoring works after a manual source/database adjustment, but the two
+  repositories describe different Source/endpoints; later agents either add target deployment to
+  sre-kit or revive a second monitoring dashboard in infraegev2.
 - **Root cause**: infraegev2 and sre-kit are separate repositories even though both are first-party
   parts of one operational system.
-- **Fix**: create coordinated active Backlog items in both repositories. Keep reusable core,
-  adapters, source configuration, presets and observability deployment in sre-kit; keep
-  application telemetry and VPS/network prerequisites in infraegev2. Move a running component only
-  through an explicit migration item with state, rollback and continuity proof.
+- **Fix**: create coordinated active Backlog items in both repositories. Keep adapters,
+  normalization, alerts and monitoring UI in sre-kit; keep target installation, credentials,
+  Compose/systemd lifecycle and backup/restore in infraegev2 `ops/`. Integrate only through
+  versioned Source registration and Metric/Check/Event ingestion contracts.
+
+### Retired provisioning tables are intentionally inert
+
+- **Symptoms**: an upgraded SQLite database still contains `hosts`, `provisioning_runs` and
+  `sources.host_id` although the API and UI no longer expose deployment.
+- **Root cause**: Change 15 removes the write-capable product boundary without running destructive
+  SQLite cleanup against user data created by the experimental prototype.
+- **Fix**: leave migration `0003` and its data unchanged. Inventory it before proposing a separate
+  forward-only cleanup migration; never re-enable Host/provisioner runtime merely because the
+  tables exist.
 
 ### Docker-owned files break host operations (`EACCES` / `EPERM` / read-only)
 

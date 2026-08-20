@@ -29,8 +29,9 @@ Telegram.
   is visible within seconds of an adapter emitting it.
 - **Alert router** — rule-based evaluation over Metric/Check/Event with a full firing → resolved
   lifecycle, delivered to Telegram.
-- **Single static binary** — Go backend, SQLite storage, one Docker container (or a plain binary +
-  systemd unit) as the deploy target.
+- **Small self-hosted core** — Go API, SQLite storage, independently built web UI and first-party
+  adapter subprocesses. A unified release artifact is planned for M11; current Docker packaging
+  contains the API and adapters only.
 
 ## Architecture at a glance
 
@@ -50,12 +51,11 @@ the entire contract. Writing a new source means writing a new adapter, not touch
 
 ### Relationship with infraegev2
 
-[`infraegev2`](https://github.com/avatarsik6699/infraegev2) is this project's first-party reference
-deployment, not an unrelated external consumer. sre-kit owns the observability core, adapters,
-source configuration, presets and observability deployment automation. infraegev2 owns its
-application telemetry, VPS/network prerequisites and application Compose stack. Work crossing that
-boundary is tracked by coordinated SDD changes in both repositories; the retired infraegev2
-`apps/ops` dashboard is not a competing implementation.
+[`infraegev2`](https://github.com/avatarsik6699/infraegev2) is the first dogfood integration, not a
+repository-layout template for this product. sre-kit owns adapters, source configuration,
+normalization, alerting and the monitoring UI. infraegev2 owns installation, configuration,
+backup/restore and rollback of observability tools on its VPS. The repositories communicate only
+through versioned Source registration and telemetry ingestion contracts.
 
 See [`docs/SPEC.md`](docs/SPEC.md) for the full technical specification (data model, API
 contract, auth model, roadmap) and [`docs/STACK.md`](docs/STACK.md) for concrete stack details,
@@ -83,8 +83,8 @@ go mod download
 go run ./cmd/server
 ```
 
-The server serves both the API and the built frontend from one process
-(`SRE_KIT_ADDR`, default `:8080`).
+The Go process serves the API on `SRE_KIT_ADDR` (default `:8080`). The current frontend is built
+and served separately during development; a single packaged distribution is an M11 deliverable.
 
 For frontend development with hot reload:
 
@@ -94,7 +94,7 @@ pnpm install
 pnpm dev
 ```
 
-### Run with Docker
+### Run the API and adapters with Docker
 
 ```bash
 docker build -t sre-kit .
@@ -103,6 +103,9 @@ docker run -p 8080:8080 \
   -v sre-kit-data:/app/data \
   sre-kit
 ```
+
+The current image does not contain or serve the web build. Use the frontend development command
+above until the M11 distribution work defines the combined artifact.
 
 ### Adding a source
 

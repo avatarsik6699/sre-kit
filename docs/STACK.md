@@ -20,7 +20,7 @@
 | Backend | Go 1.2x (`x/crypto/ssh` for SSH-based collectors) |
 | Database | SQLite (`modernc.org/sqlite` or `mattn`) |
 | Cache | — (no separate cache layer; batched direct writes to SQLite) |
-| Infra | Single Docker container (or a plain binary + systemd); first-party reference deployment is the sibling `infraegev2` project, coordinated through active changes in both repositories |
+| Infra | Current Docker image contains the Go API and adapters; web is built separately. Combined local/management-VPS distribution is deferred to M11. `infraegev2` is the first dogfood integration and owns its own target automation |
 | Package managers | Go modules (backend), `pnpm` (frontend) |
 | CI | — (not yet configured) |
 

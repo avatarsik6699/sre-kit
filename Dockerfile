@@ -1,5 +1,5 @@
-# Single-container build of the Go binary, per docs/STACK.md's deploy target ("one Docker
-# container ... matches the run-locally-now, self-host-on-a-VPS-later trajectory").
+# Container build of the Go API and first-party adapter subprocesses. The web UI is intentionally
+# not packaged here yet; docs/SPEC.md M11 owns the future combined distribution.
 #
 # contract.schema.json and the SQLite migrations are go:embed'd into the binary at build time, so
 # only the compiled server + the adapters directory (subprocess binaries + manifest.json) need to
