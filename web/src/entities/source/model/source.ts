@@ -13,6 +13,7 @@ type SourceResponse =
 
 export type Source = {
   id: string;
+  projectId?: string;
   adapterId: string;
   config: string;
   enabled: boolean;
@@ -23,6 +24,7 @@ export type Source = {
 function toSource(raw: SourceResponse): Source {
   return {
     id: raw.id ?? "",
+    projectId: raw.project_id ?? "default",
     adapterId: raw.adapter_id ?? "",
     config: raw.config ?? "{}",
     enabled: raw.enabled ?? false,
@@ -56,15 +58,24 @@ export function useSourceQuery(sourceId: string) {
 export function useCreateSourceMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { adapterId: string; config: unknown }) => {
+    mutationFn: async (input: {
+      projectId?: string;
+      adapterId: string;
+      config: unknown;
+    }) => {
       // swag/openapi-typescript mistypes json.RawMessage request/response fields as number[]
       // (they're actually arbitrary JSON objects on the wire) — cast through unknown at the
       // boundary rather than trusting the generated type here.
       const result = await apiClient.POST("/api/sources", {
         body: {
           adapter_id: input.adapterId,
+          project_id: input.projectId ?? "default",
           config: input.config,
-        } as unknown as { adapter_id?: string; config?: number[] },
+        } as unknown as {
+          project_id?: string;
+          adapter_id?: string;
+          config?: number[];
+        },
       });
       if (result.error) {
         throw normalizeApiFailure(result.error, result.response.status);

@@ -1,4 +1,4 @@
-import { ActionIcon, Group, Stack, Switch, Table } from "@mantine/core";
+import { ActionIcon, Group, Stack, Switch, Table } from "~/shared/ui";
 import { PageContainer } from "~/shared/components/page-container";
 import { Typography } from "~/shared/components/typography";
 import { EmptyState } from "~/shared/components/empty-state";
@@ -7,14 +7,16 @@ import {
   useCreateAlertRuleMutation,
   useDeleteAlertRuleMutation,
   useUpdateAlertRuleMutation,
+  type AlertRule,
 } from "~/entities/alert";
 import {
   useCreateNotificationChannelMutation,
   useDeleteNotificationChannelMutation,
   useNotificationChannelsQuery,
   useUpdateNotificationChannelMutation,
+  type NotificationChannel,
 } from "~/entities/notification-channel";
-import { useSourcesQuery } from "~/entities/source";
+import { useSourcesQuery, type Source } from "~/entities/source";
 import { AlertRuleForm } from "~/widgets/alert-rule-form";
 import { NotificationChannelForm } from "~/widgets/notification-channel-form";
 
@@ -39,7 +41,8 @@ export const NotificationsPage: React.FC = () => {
 
   function sourceLabel(sourceId: string): string {
     return (
-      sources.find((source) => source.id === sourceId)?.adapterId ?? sourceId
+      sources.find((source: Source) => source.id === sourceId)?.adapterId ??
+      sourceId
     );
   }
 
@@ -70,7 +73,7 @@ export const NotificationsPage: React.FC = () => {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {channels.map((channel) => (
+                {channels.map((channel: NotificationChannel) => (
                   <Table.Tr key={channel.id}>
                     <Table.Td>
                       <Typography mono>{channel.type}</Typography>
@@ -133,7 +136,7 @@ export const NotificationsPage: React.FC = () => {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {rules.map((rule) => (
+                {rules.map((rule: AlertRule) => (
                   <Table.Tr key={rule.id}>
                     <Table.Td>
                       <Typography mono>{sourceLabel(rule.sourceId)}</Typography>

@@ -12,19 +12,67 @@ import { apiClient, normalizeApiFailure } from "~/shared/api";
 import { useStreamSubscription } from "~/shared/lib/use-stream-subscription";
 import type { StreamFrame } from "~/shared/lib/ws-stream-store";
 
-export type MetricPoint = { name: string; ts: string; value: number };
-export type CheckStatus = { name: string; ts: string; status: string };
-export type EventItem = { ts: string; level: string; message: string };
+export type MetricPoint = {
+  name: string;
+  ts: string;
+  value: number;
+  labels?: Record<string, string>;
+};
+export type CheckStatus = {
+  name: string;
+  ts: string;
+  status: string;
+  meta: Record<string, unknown>;
+};
+export type EventItem = {
+  ts: string;
+  level: string;
+  message: string;
+  labels: Record<string, string>;
+};
 
 // Loose shapes accepted by the converters below — both the generated REST response types (every
 // field optional, per openapi-typescript) and the WS StreamXPayload types (fields guaranteed
 // present) satisfy these structurally.
-type MetricLike = { name?: string; ts?: string; value?: number };
-type CheckLike = { name?: string; ts?: string; status?: string };
-type EventLike = { ts?: string; level?: string; message?: string };
+type MetricLike = {
+  name?: string;
+  ts?: string;
+  value?: number;
+  labels?: unknown;
+};
+type CheckLike = {
+  name?: string;
+  ts?: string;
+  status?: string;
+  meta?: unknown;
+};
+type EventLike = {
+  ts?: string;
+  level?: string;
+  message?: string;
+  labels?: unknown;
+};
+
+function labels(raw: unknown): Record<string, string> {
+  if (raw && typeof raw === "object" && !Array.isArray(raw))
+    return raw as Record<string, string>;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as Record<string, string>;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
 
 function toMetricPoint(raw: MetricLike): MetricPoint {
-  return { name: raw.name ?? "", ts: raw.ts ?? "", value: raw.value ?? 0 };
+  return {
+    name: raw.name ?? "",
+    ts: raw.ts ?? "",
+    value: raw.value ?? 0,
+    labels: labels(raw.labels),
+  };
 }
 
 function toCheckStatus(raw: CheckLike): CheckStatus {
@@ -32,6 +80,10 @@ function toCheckStatus(raw: CheckLike): CheckStatus {
     name: raw.name ?? "",
     ts: raw.ts ?? "",
     status: raw.status ?? "unreachable",
+    meta:
+      raw.meta && typeof raw.meta === "object"
+        ? (raw.meta as Record<string, unknown>)
+        : {},
   };
 }
 
@@ -40,6 +92,7 @@ function toEventItem(raw: EventLike): EventItem {
     ts: raw.ts ?? "",
     level: raw.level ?? "info",
     message: raw.message ?? "",
+    labels: labels(raw.labels),
   };
 }
 

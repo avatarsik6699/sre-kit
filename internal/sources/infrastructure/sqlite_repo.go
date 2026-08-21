@@ -22,10 +22,13 @@ func NewSQLiteRepository(db *sql.DB) *SQLiteRepository {
 }
 
 func (r *SQLiteRepository) Create(ctx context.Context, source domain.Source) error {
+	if source.ProjectID == "" {
+		source.ProjectID = "default"
+	}
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO sources (id, adapter_name, config_json, enabled, last_status, last_seen_at)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		source.ID, source.AdapterName, source.ConfigJSON, source.Enabled, source.LastStatus, nullableTime(source.LastSeenAt))
+		INSERT INTO sources (id, project_id, adapter_name, config_json, enabled, last_status, last_seen_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		source.ID, source.ProjectID, source.AdapterName, source.ConfigJSON, source.Enabled, source.LastStatus, nullableTime(source.LastSeenAt))
 	if err != nil {
 		return fmt.Errorf("sources: insert: %w", err)
 	}
@@ -34,9 +37,9 @@ func (r *SQLiteRepository) Create(ctx context.Context, source domain.Source) err
 
 func (r *SQLiteRepository) Update(ctx context.Context, source domain.Source) error {
 	res, err := r.db.ExecContext(ctx, `
-		UPDATE sources SET adapter_name = ?, config_json = ?, enabled = ?, last_status = ?, last_seen_at = ?
+		UPDATE sources SET project_id = ?, adapter_name = ?, config_json = ?, enabled = ?, last_status = ?, last_seen_at = ?
 		WHERE id = ?`,
-		source.AdapterName, source.ConfigJSON, source.Enabled, source.LastStatus, nullableTime(source.LastSeenAt), source.ID)
+		source.ProjectID, source.AdapterName, source.ConfigJSON, source.Enabled, source.LastStatus, nullableTime(source.LastSeenAt), source.ID)
 	if err != nil {
 		return fmt.Errorf("sources: update: %w", err)
 	}
@@ -48,7 +51,7 @@ func (r *SQLiteRepository) Update(ctx context.Context, source domain.Source) err
 
 func (r *SQLiteRepository) Get(ctx context.Context, id string) (domain.Source, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, adapter_name, config_json, enabled, last_status, last_seen_at
+		SELECT id, project_id, adapter_name, config_json, enabled, last_status, last_seen_at
 		FROM sources WHERE id = ?`, id)
 	source, err := scanSource(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -62,7 +65,7 @@ func (r *SQLiteRepository) Get(ctx context.Context, id string) (domain.Source, e
 
 func (r *SQLiteRepository) List(ctx context.Context) ([]domain.Source, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, adapter_name, config_json, enabled, last_status, last_seen_at
+		SELECT id, project_id, adapter_name, config_json, enabled, last_status, last_seen_at
 		FROM sources ORDER BY id`)
 	if err != nil {
 		return nil, fmt.Errorf("sources: list: %w", err)
@@ -102,7 +105,7 @@ type rowScanner interface {
 func scanSource(scanner rowScanner) (domain.Source, error) {
 	var source domain.Source
 	var lastSeenAt sql.NullTime
-	if err := scanner.Scan(&source.ID, &source.AdapterName, &source.ConfigJSON, &source.Enabled, &source.LastStatus, &lastSeenAt); err != nil {
+	if err := scanner.Scan(&source.ID, &source.ProjectID, &source.AdapterName, &source.ConfigJSON, &source.Enabled, &source.LastStatus, &lastSeenAt); err != nil {
 		return domain.Source{}, err
 	}
 	if lastSeenAt.Valid {

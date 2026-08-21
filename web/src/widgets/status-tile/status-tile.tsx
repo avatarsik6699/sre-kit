@@ -1,5 +1,4 @@
-import { Card, Group, Stack } from "@mantine/core";
-import { Sparkline } from "@mantine/charts";
+import { Card, Group, Stack } from "~/shared/ui";
 import { Link } from "@tanstack/react-router";
 import {
   StatusPulse,
@@ -115,15 +114,10 @@ export const StatusTile: React.FC<StatusTileTypes.Props> = (props) => {
             ) : null}
           </Group>
           {sparklineData.length > 1 ? (
-            <Sparkline
-              data={sparklineData}
-              trendColors={{
-                positive: "statusOk",
-                negative: "statusCritical",
-                neutral: "statusUnreachable",
-              }}
-              h={40}
-            />
+            <Typography mono>
+              {sparklineData.at(-1)?.toLocaleString()} · {sparklineData.length}{" "}
+              samples
+            </Typography>
           ) : (
             <Typography c="dimmed">no metrics yet</Typography>
           )}

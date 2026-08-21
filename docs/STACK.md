@@ -16,7 +16,7 @@
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React **19.2.8**, TanStack Start **1.168.44**, Mantine **9.5.1** exact (`@mantine/charts` for time-series/live charts), Vite **8.2.1** and TanStack Query **5.101.4** over the WS stream |
+| Frontend | React **19.2.8**, TanStack Start **1.168.44**, Base UI **1.7.0**, uPlot **1.6.32**, Vite **8.2.1** and TanStack Query **5.101.4** over the WS stream |
 | Backend | Go **1.26.5** (`x/crypto/ssh` for SSH-based collectors) |
 | Database | SQLite (`modernc.org/sqlite` or `mattn`) |
 | Cache | — (no separate cache layer; batched direct writes to SQLite) |
@@ -50,8 +50,9 @@ set +a
 ```
 
 Run the API with the required environment loaded (`go run ./cmd/server`) and the web development
-server separately (`pnpm --dir web dev`). The current Docker image packages the API and all six
-production adapters but not the web build; the combined distribution remains M11.
+server separately (`pnpm --dir web dev`). The current Docker image packages the API, six pull
+adapter binaries and the passive push manifest, but not the web build; the combined distribution
+remains M11.
 
 ---
 
@@ -201,8 +202,8 @@ cmd/server/main.go                         # composition root — manual wiring,
 internal/platform/config/config.go          # typed settings from env
 internal/platform/db/sqlite.go              # connection + migration runner
 internal/platform/db/migrations/0001_init.sql
-                                             # sources, metrics, checks, events, alerts,
-                                             # alert_rules and reserved metrics_rollup
+                                             # projects, sources, raw telemetry, hourly rollups,
+                                             # ingestion batches, alerts and maintenance runs
 internal/platform/secrets/secrets.go        # secrets.enc.json read/write — shared kernel used by
                                              # sources.secret_ref and auth's password hash
 internal/platform/httpserver/server.go      # HTTP server bootstrap + router mount
@@ -218,12 +219,14 @@ internal/sources/
   infrastructure/sqlite_repo.go
   interfaces/http/handlers.go # /api/sources (GET/POST/PATCH/DELETE)
 
+internal/projects/             # Project CRUD and SQLite repository
+
 internal/telemetry/
   domain/{metric,check,event}.go   # entities + Repository interfaces
   application/service.go           # Ingest use-case (implements adapterengine's TelemetryIngestor
                                     # port) + Query use-cases
-  infrastructure/sqlite_repo.go
-  interfaces/http/handlers.go      # /api/metrics, /api/checks, /api/events
+  infrastructure/{sqlite_repo,batch_repo,maintenance}.go
+  interfaces/http/{handlers,push}.go # bounded reads and Source-token push ingress
 
 internal/alertrouter/
   domain/                           # Alert lifecycle and rule evaluation
@@ -234,7 +237,7 @@ internal/alertrouter/
 
 internal/adapterengine/       # named to avoid colliding with the top-level adapters/ dir
                                # (external subprocess adapter binaries)
-  domain/manifest.go          # Manifest, Mode(pull|stream) + validation
+  domain/manifest.go          # Manifest, Mode(pull|stream|push) + validation
   application/ports.go        # TelemetryIngestor port (interface) — adapterengine depends on this
                                # abstraction, not concretely on internal/telemetry; main.go wires
                                # telemetry.application.Service as the implementation
@@ -254,7 +257,9 @@ internal/auth/
 internal/platform/wshub/        # authenticated /api/stream fan-out for telemetry and alerts
 
 adapters/{host-metrics-ssh,uptime-http,fail2ban-ssh,journal-http,beszel-api,umami-http}/
-                                      # six production pull adapters plus adapters/stub for tests
+                                      # six production pull adapters
+adapters/push/                       # passive Source manifest; no subprocess
+adapters/stub/                       # test-only pull adapter
 ```
 
 **Cross-module dependencies use ports, not direct imports.** When one bounded context needs
@@ -276,9 +281,9 @@ SQLite, real HTTP) is gated behind `testing.Short()` so it only runs in Full Gat
 `go test ./...`.
 
 **Deferred, not yet wired**: `Supervisor` has focused stream-mode tests, but the composition root
-schedules pull adapters only because no stream adapter exists. Generic push ingress/webhooks are
-an M9 contract and are not present in the generated HTTP API. The combined API+web distribution
-and its deployment/backup lifecycle remain M11.
+schedules pull adapters only because no stream adapter exists. Push Sources are passive and use
+the generated Source-token records endpoint; they never spawn a subprocess. The combined API+web
+distribution and its deployment/backup lifecycle remain M11.
 
 ### API contract generation
 
@@ -306,12 +311,12 @@ describes the HTTP/WS surface the frontend consumes.
 
 ## Frontend Architecture (FSD-like)
 
-> Binding coding conventions (naming, destructuring, effects, types, Mantine policy components,
+> Binding coding conventions (naming, destructuring, effects, types, shared policy components,
 > testing) live in [`docs/FRONTEND_CONVENTIONS.md`](./FRONTEND_CONVENTIONS.md) — this section is
 > the layer/tooling contract those conventions assume, not a restatement of them.
 
 > Style reference: ported from `/home/niquetamerewsl/projects/infraegev2`'s `apps/web` — same
-> stack (React + TanStack Start + TanStack Query + Mantine), genuinely FSD, so this translates
+> stack (React + TanStack Start + TanStack Query + Base UI/uPlot), genuinely FSD, so this translates
 > almost directly.
 
 ```
@@ -329,14 +334,14 @@ web/
         ├── api/              # client.ts (openapi-fetch instance), errors.ts (ApiError,
         │                     # normalizeApiFailure), schema.ts (generated — see § API contract
         │                     # generation above), index.ts (public API)
-        ├── components/       # Mantine-wrapping policy components (Typography, Image,
+        ├── components/       # policy components (Typography, Image,
         │                     # ExternalLink, PageContainer), route-state (RoutePending/
         │                     # RouteError/RouteNotFound), empty-state, navigation-progress,
         │                     # client-error-monitor — root component colocated with
         │                     # *.types.ts + optional *.module.css; no forced ui/ sub-segment;
         │                     # complex slices get a components/ subfolder
         ├── config/           # client-env.ts (one place reading import.meta.env),
-        │                     # mantine-theme.ts (owns theme/defaults — see docs/SPEC.md §5.3
+        │                     # design-tokens.ts (owns global values — see docs/SPEC.md §5.3
         │                     # for the actual palette/typography tokens it's populated with)
         ├── lib/               # safe-ls.ts, safe-json.ts, query-client.ts, client-errors/ and
         │                     # the active ws-stream-store/use-stream-subscription boundary
@@ -366,7 +371,7 @@ Conventions, ported near-verbatim from the reference:
     below it (§ tree above), and cross-slice imports must go through a slice's `index.ts` — no
     deep imports.
   - Policy-component bans: `no-restricted-imports`/`no-restricted-syntax` forbidding raw
-    `<a>`/`<img>` and direct Mantine `Anchor`/`Container`/`Image`/`Text`/`Title` outside `shared`
+    raw `<a>`/`<img>` outside their shared policy owners
     (see `docs/FRONTEND_CONVENTIONS.md` § 8).
   - `no-restricted-globals` banning `window`/`document`/`navigator`/`localStorage`/
     `sessionStorage`/`fetch`/`process` everywhere, with a narrow per-file allow-list for the one

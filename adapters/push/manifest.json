@@ -1,0 +1,21 @@
+{
+  "name": "push",
+  "version": "0.1.0",
+  "mode": "push",
+  "emits": ["metric", "check", "event"],
+  "presentation_schema": {
+    "groups": [
+      {"id":"traffic","title":"Traffic composition","order":10},
+      {"id":"signals","title":"Producer signals","order":20}
+    ],
+    "measurements": [
+      {"name":"traffic.request_count","title":"Requests","group":"traffic","unit":"count","visualization":"table","dimensions":["traffic_class","path","status_family"]},
+      {"name":"*","title":"Signal","group":"signals","visualization":"timeseries"}
+    ]
+  },
+  "config_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  }
+}

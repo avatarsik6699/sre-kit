@@ -1,13 +1,13 @@
-import { mantineThemeConstants } from "~/shared/config/mantine-theme";
+import { designTokens } from "~/shared/config/design-tokens";
 import { Typography } from "~/shared/components/typography";
 import classes from "./status-pulse.module.css";
 import type { StatusPulseTypes } from "./status-pulse.types";
 
 const statusColor: Record<StatusPulseTypes.Props["status"], string> = {
-  ok: mantineThemeConstants.statusOk,
-  warn: mantineThemeConstants.statusWarn,
-  critical: mantineThemeConstants.statusCritical,
-  unreachable: mantineThemeConstants.statusUnreachable,
+  ok: designTokens.statusOk,
+  warn: designTokens.statusWarn,
+  critical: designTokens.statusCritical,
+  unreachable: designTokens.statusUnreachable,
 };
 
 /**

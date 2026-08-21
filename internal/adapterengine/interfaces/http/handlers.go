@@ -27,12 +27,13 @@ func (h *Handlers) Register(mux *http.ServeMux) {
 }
 
 type adapterResponse struct {
-	Name             string          `json:"name"`
-	Version          string          `json:"version"`
-	Mode             string          `json:"mode"`
-	Emits            []string        `json:"emits"`
-	ConfigSchema     json.RawMessage `json:"config_schema"`
-	HeartbeatSeconds int             `json:"heartbeat_seconds,omitempty"`
+	Name               string          `json:"name"`
+	Version            string          `json:"version"`
+	Mode               string          `json:"mode"`
+	Emits              []string        `json:"emits"`
+	ConfigSchema       json.RawMessage `json:"config_schema"`
+	PresentationSchema json.RawMessage `json:"presentation_schema,omitempty"`
+	HeartbeatSeconds   int             `json:"heartbeat_seconds,omitempty"`
 }
 
 // list godoc
@@ -57,12 +58,13 @@ func (h *Handlers) list(w http.ResponseWriter, r *http.Request) {
 	responses := make([]adapterResponse, 0, len(installed))
 	for _, adapter := range installed {
 		responses = append(responses, adapterResponse{
-			Name:             adapter.Manifest.Name,
-			Version:          adapter.Manifest.Version,
-			Mode:             string(adapter.Manifest.Mode),
-			Emits:            adapter.Manifest.Emits,
-			ConfigSchema:     adapter.Manifest.ConfigSchema,
-			HeartbeatSeconds: adapter.Manifest.HeartbeatSeconds,
+			Name:               adapter.Manifest.Name,
+			Version:            adapter.Manifest.Version,
+			Mode:               string(adapter.Manifest.Mode),
+			Emits:              adapter.Manifest.Emits,
+			ConfigSchema:       adapter.Manifest.ConfigSchema,
+			PresentationSchema: adapter.Manifest.PresentationSchema,
+			HeartbeatSeconds:   adapter.Manifest.HeartbeatSeconds,
 		})
 	}
 

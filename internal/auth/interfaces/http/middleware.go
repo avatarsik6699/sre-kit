@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"sre-kit/internal/auth/application"
 	"sre-kit/internal/auth/domain"
@@ -22,7 +23,7 @@ var publicPaths = map[string]bool{
 func RequireSession(svc *application.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if publicPaths[r.URL.Path] {
+			if publicPaths[r.URL.Path] || (r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/sources/") && strings.HasSuffix(r.URL.Path, "/records")) {
 				next.ServeHTTP(w, r)
 				return
 			}

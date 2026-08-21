@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ActionIcon, NavLink, Stack } from "@mantine/core";
+import { ActionIcon, Stack } from "~/shared/ui";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { mantineThemeConstants } from "~/shared/config/mantine-theme";
+import { designTokens } from "~/shared/config/design-tokens";
+import styles from "./rail-nav.module.css";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: "◧" },
@@ -19,28 +20,29 @@ export const RailNav: React.FC = () => {
     <Stack
       component="nav"
       justify="space-between"
-      w={collapsed ? 56 : 200}
       p="xs"
       gap={4}
+      className={styles.nav}
       style={{
-        borderRight: `1px solid ${mantineThemeConstants.bgSurfaceRaised}`,
-        transition: "width 150ms ease",
-        flexShrink: 0,
-      }}
+        "--rail-width": collapsed ? "56px" : "200px",
+        "--rail-border": designTokens.bgSurfaceRaised,
+      } as React.CSSProperties}
     >
-      <Stack gap={4}>
+      <Stack gap={4} className={styles.items}>
         {NAV_ITEMS.map((item) => (
-          <NavLink
+          <Link
             key={item.to}
-            component={Link}
             to={item.to}
-            label={collapsed ? undefined : item.label}
-            leftSection={item.icon}
-            active={routerState.location.pathname === item.to}
-          />
+            className={`${styles.link} ${routerState.location.pathname === item.to ? styles.active : ""}`}
+            aria-label={collapsed ? item.label : undefined}
+          >
+            <span aria-hidden="true">{item.icon}</span>
+            {collapsed ? null : <span>{item.label}</span>}
+          </Link>
         ))}
       </Stack>
       <ActionIcon
+        className={styles.toggle}
         variant="subtle"
         aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
         onClick={() => setCollapsed((prev) => !prev)}

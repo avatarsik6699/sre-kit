@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "mode": "pull",
   "emits": ["metric"],
+  "presentation_schema": {"groups":[{"id":"test","title":"Test telemetry","order":10}],"measurements":[{"name":"*","title":"Stub metric","group":"test","visualization":"timeseries"}]},
   "config_schema": {
     "type": "object",
     "properties": {},

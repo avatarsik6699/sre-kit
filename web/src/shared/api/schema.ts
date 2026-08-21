@@ -543,6 +543,10 @@ export interface paths {
                     from?: string;
                     /** @description RFC3339 upper bound */
                     to?: string;
+                    /** @description raw or hour */
+                    resolution?: string;
+                    /** @description 1..5000 points */
+                    limit?: number;
                 };
                 header?: never;
                 path?: never;
@@ -828,6 +832,132 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List projects */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["internal_projects_interfaces_http.response"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create project */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description project */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["internal_projects_interfaces_http.request"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["internal_projects_interfaces_http.response"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete project */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description project ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Update project */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description project ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description project fields */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["internal_projects_interfaces_http.request"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["internal_projects_interfaces_http.response"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
     "/api/sources": {
         parameters: {
             query?: never;
@@ -1054,6 +1184,129 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/sources/{id}/ingest-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate a Source push token */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description source ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{id}/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Push an idempotent telemetry batch */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description unique batch key */
+                    "Idempotency-Key": string;
+                };
+                path: {
+                    /** @description source ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description versioned Metric/Check/Event batch */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["internal_telemetry_interfaces_http.pushBatch"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: string;
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stream": {
         parameters: {
             query?: never;
@@ -1093,6 +1346,7 @@ export interface components {
             heartbeat_seconds?: number;
             mode?: string;
             name?: string;
+            presentation_schema?: number[];
             version?: string;
         };
         "internal_alertrouter_interfaces_http.alertResponse": {
@@ -1148,9 +1402,23 @@ export interface components {
         "internal_auth_interfaces_http.loginRequest": {
             password?: string;
         };
+        "internal_projects_interfaces_http.request": {
+            description?: string;
+            name?: string;
+            slug?: string;
+        };
+        "internal_projects_interfaces_http.response": {
+            created_at?: string;
+            description?: string;
+            id?: string;
+            name?: string;
+            slug?: string;
+            updated_at?: string;
+        };
         "internal_sources_interfaces_http.createSourceRequest": {
             adapter_id?: string;
             config?: number[];
+            project_id?: string;
         };
         "internal_sources_interfaces_http.sourceResponse": {
             adapter_id?: string;
@@ -1159,30 +1427,57 @@ export interface components {
             id?: string;
             last_seen_at?: string;
             last_status?: string;
+            project_id?: string;
         };
         "internal_sources_interfaces_http.updateSourceRequest": {
             config?: number[];
             enabled?: boolean;
         };
         "internal_telemetry_interfaces_http.checkResponse": {
-            meta?: string;
+            meta?: {
+                [key: string]: unknown;
+            };
             name?: string;
             source_id?: string;
             status?: string;
             ts?: string;
         };
         "internal_telemetry_interfaces_http.eventResponse": {
-            labels?: string;
+            labels?: {
+                [key: string]: string;
+            };
             level?: string;
             message?: string;
             source_id?: string;
             ts?: string;
         };
         "internal_telemetry_interfaces_http.metricResponse": {
-            labels?: string;
+            labels?: {
+                [key: string]: string;
+            };
             name?: string;
+            resolution?: string;
             source_id?: string;
             ts?: string;
+            value?: number;
+        };
+        "internal_telemetry_interfaces_http.pushBatch": {
+            records?: components["schemas"]["internal_telemetry_interfaces_http.pushRecord"][];
+            schema_version?: string;
+        };
+        "internal_telemetry_interfaces_http.pushRecord": {
+            labels?: {
+                [key: string]: string;
+            };
+            level?: string;
+            message?: string;
+            meta?: {
+                [key: string]: unknown;
+            };
+            name?: string;
+            status?: string;
+            timestamp?: string;
+            type?: string;
             value?: number;
         };
     };

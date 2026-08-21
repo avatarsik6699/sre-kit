@@ -1,13 +1,7 @@
-// Root route (docs/changes/archive/01-core-skeleton.md I10): document shell, dark-default Mantine theme
+// Root route: document shell and the app-wide client-error boundary.
 // (docs/SPEC.md §5.3), and the two app-wide side-effect mounts — ClientErrorMonitor (I9) and the
 // navigation progress bar (I8). No page/feature content lives here — real pages start at M4.
-import {
-  ColorSchemeScript,
-  MantineProvider,
-  mantineHtmlProps,
-} from "@mantine/core";
-import "@mantine/core/styles.css";
-import "@mantine/nprogress/styles.css";
+import "~/shared/styles/global.css";
 import {
   HeadContent,
   Outlet,
@@ -17,8 +11,6 @@ import {
 import type { QueryClient } from "@tanstack/react-query";
 import type React from "react";
 import { ClientErrorMonitor } from "~/shared/components/client-error-monitor";
-import { NavigationProgress } from "~/shared/components/navigation-progress";
-import { mantineTheme } from "~/shared/config/mantine-theme";
 
 // Typed router context (queryClient, wired in router.tsx) — routes/_authenticated.tsx's
 // beforeLoad reads context.queryClient to warm/guard the sources query before rendering.
@@ -46,17 +38,17 @@ type RootDocumentProps = { children: React.ReactNode };
 
 function RootDocument(props: RootDocumentProps) {
   return (
-    <html lang="en" {...mantineHtmlProps}>
+    <html lang="en">
       <head>
-        <ColorSchemeScript defaultColorScheme="dark" />
         <HeadContent />
+        <link
+          rel="icon"
+          href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%236387f5'/%3E%3Cpath d='M18 18h8v28h-8zm20 0h8v28h-8z' fill='%230b0e14'/%3E%3C/svg%3E"
+        />
       </head>
       <body>
-        <MantineProvider theme={mantineTheme} defaultColorScheme="dark">
-          <NavigationProgress />
-          <ClientErrorMonitor />
-          {props.children}
-        </MantineProvider>
+        <ClientErrorMonitor />
+        {props.children}
         <Scripts />
       </body>
     </html>

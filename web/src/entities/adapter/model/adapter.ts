@@ -7,6 +7,26 @@ import type { components } from "~/shared/api";
 type AdapterResponse =
   components["schemas"]["internal_adapterengine_interfaces_http.adapterResponse"];
 
+export type PresentationGroup = {
+  id: string;
+  title: string;
+  order?: number;
+};
+
+export type PresentationMeasurement = {
+  name: string;
+  title: string;
+  group: string;
+  unit?: "count" | "seconds" | "percent" | string;
+  visualization?: "stat" | "timeseries" | "table" | "status" | "feed" | string;
+  dimensions?: string[];
+};
+
+export type PresentationSchema = {
+  groups: PresentationGroup[];
+  measurements: PresentationMeasurement[];
+};
+
 export type AdapterManifest = {
   name: string;
   version: string;
@@ -15,10 +35,13 @@ export type AdapterManifest = {
   // See entities/source/model/source.ts's comment: json.RawMessage fields are mistyped as
   // number[] by the generator; the wire value is really a JSON Schema object.
   configSchema: Record<string, unknown>;
+  presentationSchema: PresentationSchema;
   heartbeatSeconds?: number;
 };
 
 function toAdapterManifest(raw: AdapterResponse): AdapterManifest {
+  const presentation =
+    (raw.presentation_schema as unknown as Partial<PresentationSchema>) ?? {};
   return {
     name: raw.name ?? "",
     version: raw.version ?? "",
@@ -26,6 +49,12 @@ function toAdapterManifest(raw: AdapterResponse): AdapterManifest {
     emits: raw.emits ?? [],
     configSchema:
       (raw.config_schema as unknown as Record<string, unknown>) ?? {},
+    presentationSchema: {
+      groups: Array.isArray(presentation.groups) ? presentation.groups : [],
+      measurements: Array.isArray(presentation.measurements)
+        ? presentation.measurements
+        : [],
+    },
     heartbeatSeconds: raw.heartbeat_seconds,
   };
 }

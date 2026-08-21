@@ -20,6 +20,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	adapterengineapp "sre-kit/internal/adapterengine/application"
 	adapterenginedomain "sre-kit/internal/adapterengine/domain"
@@ -36,6 +37,9 @@ import (
 	"sre-kit/internal/platform/httpserver"
 	"sre-kit/internal/platform/secrets"
 	"sre-kit/internal/platform/wshub"
+	projectsapp "sre-kit/internal/projects/application"
+	projectsinfra "sre-kit/internal/projects/infrastructure"
+	projectshttp "sre-kit/internal/projects/interfaces/http"
 	sourcesapp "sre-kit/internal/sources/application"
 	sourcesdomain "sre-kit/internal/sources/domain"
 	sourcesinfra "sre-kit/internal/sources/infrastructure"
@@ -145,6 +149,8 @@ func main() {
 	}
 
 	sourcesRepo := sourcesinfra.NewSQLiteRepository(sqlDB)
+	projectsService := projectsapp.NewService(projectsinfra.NewSQLiteRepository(sqlDB))
+	projectshttp.NewHandlers(projectsService).Register(srv.Mux)
 	sourcesService := sourcesapp.NewService(sourcesRepo,
 		sourcesapp.WithSecrets(secretsStore),
 		sourcesapp.WithAdapterConfigSchemas(adapterConfigSchema),
@@ -161,6 +167,19 @@ func main() {
 	alertrouterhttp.NewHandlers(alertrouterService).Register(srv.Mux)
 
 	telemetryRepos := telemetryinfra.NewSQLiteRepository(sqlDB)
+	maintenance := telemetryinfra.NewMaintenance(sqlDB)
+	if err := maintenance.Run(context.Background()); err != nil {
+		log.Printf("telemetry maintenance: %v", err)
+	}
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := maintenance.Run(context.Background()); err != nil {
+				log.Printf("telemetry maintenance: %v", err)
+			}
+		}
+	}()
 	telemetryService := telemetryapp.NewService(
 		telemetryRepos.Metrics, telemetryRepos.Checks, telemetryRepos.Events,
 		telemetryapp.WithPublisher(hubPublisher{hub: hub}),
@@ -168,6 +187,7 @@ func main() {
 		telemetryapp.WithAlertEvaluator(alertrouterService),
 	)
 	telemetryhttp.NewHandlers(telemetryService, hub).Register(srv.Mux)
+	telemetryhttp.NewPushHandlers(telemetryService, sourcesService, secretsStore, telemetryinfra.NewBatchRepository(sqlDB)).Register(srv.Mux)
 
 	// Adapter engine: pull-mode sources are kept scheduled in sync with source state via
 	// sourcesService.OnChange below (see docs/changes/archive/01-core-skeleton.md Architect Review Notes
@@ -203,6 +223,11 @@ func main() {
 		for _, adapter := range installed {
 			if adapter.Manifest.Name != source.AdapterName {
 				continue
+			}
+			if adapter.Manifest.Mode == adapterenginedomain.ModePush {
+				// Push Sources are passive ingestion identities. Their Source-scoped token is the
+				// execution boundary, so no local subprocess or scheduler job exists.
+				return
 			}
 			if adapter.Manifest.Mode != adapterenginedomain.ModePull {
 				log.Printf("adapterengine: source %s uses non-pull adapter %q — stream-mode scheduling isn't wired yet", source.ID, adapter.Manifest.Name)

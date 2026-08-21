@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "mode": "pull",
   "emits": ["event"],
+  "presentation_schema": {"groups":[{"id":"security","title":"Security events","order":10}],"measurements":[{"name":"*","title":"Bans and releases","group":"security","visualization":"feed"}]},
   "config_schema": {
     "type": "object",
     "properties": {

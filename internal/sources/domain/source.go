@@ -20,6 +20,7 @@ const (
 // adapter config (docs/SPEC.md §4), so historical attribution survives a host/IP change.
 type Source struct {
 	ID          string
+	ProjectID   string
 	AdapterName string
 	ConfigJSON  string
 	Enabled     bool

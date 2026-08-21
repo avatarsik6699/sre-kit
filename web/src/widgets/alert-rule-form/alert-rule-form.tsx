@@ -6,7 +6,7 @@ import {
   Select,
   Stack,
   TextInput,
-} from "@mantine/core";
+} from "~/shared/ui";
 import type { AlertRuleFormTypes } from "./alert-rule-form.types";
 
 const CONDITIONS = [

@@ -19,10 +19,12 @@ type Metric struct {
 
 // MetricQuery filters MetricRepository.Query. Zero-value fields are unfiltered ("any").
 type MetricQuery struct {
-	SourceID string
-	Name     string
-	From     *time.Time
-	To       *time.Time
+	SourceID   string
+	Name       string
+	From       *time.Time
+	To         *time.Time
+	Limit      int
+	Resolution string
 }
 
 // MetricRepository is the persistence port for Metric, implemented by

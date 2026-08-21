@@ -233,3 +233,38 @@ func TestFetchStats_AllZeroTrafficIsNotAnError(t *testing.T) {
 		t.Fatalf("got %+v, want zero value", stats)
 	}
 }
+
+func TestFetchDimensionPreservesAggregateLabels(t *testing.T) {
+	var gotQuery string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		if r.Header.Get("Authorization") != "Bearer tok" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		fmt.Fprint(w, `[{"x":"DE","y":12},{"x":"US","y":4}]`)
+	}))
+	defer server.Close()
+
+	values, err := fetchDimension(
+		&http.Client{},
+		config{BaseURL: server.URL, WebsiteID: "site1"},
+		"tok",
+		"country",
+		time.UnixMilli(1000),
+		time.UnixMilli(2000),
+	)
+	if err != nil {
+		t.Fatalf("fetchDimension: %v", err)
+	}
+	if len(values) != 2 || values[0].X != "DE" || values[0].Y != 12 {
+		t.Fatalf("values = %+v", values)
+	}
+	if !strings.Contains(gotQuery, "type=country") || !strings.Contains(gotQuery, "startAt=1000") {
+		t.Fatalf("query = %q", gotQuery)
+	}
+	line := dimensionNDJSON("country", values[0].X, values[0].Y, time.Unix(0, 0).UTC())
+	if line.Name != "analytics.country_count" || line.Labels["traffic_class"] != "browser_analytics" || line.Labels["value"] != "DE" {
+		t.Fatalf("labels = %+v", line.Labels)
+	}
+}

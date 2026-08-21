@@ -131,33 +131,28 @@ slice/
   multiple consumers.
 - `src/routeTree.gen.ts` is generated code and is exempt from all authoring conventions.
 
-## 8. Styling and Mantine
+## 8. Styling and interaction primitives
 
-- Pin every adopted `@mantine/*` package to the exact same version — version ranges and mixed
-  Mantine versions across packages are forbidden.
-- `shared/config/mantine-theme.ts` owns all global Mantine theme values and component defaults.
-  Project CSS variables may alias those theme values for cases where native semantic renderers
-  need them.
+- Mantine and Recharts are prohibited dependencies. Use repository-owned semantic HTML/CSS and
+  Base UI for headless interaction behavior that is genuinely non-trivial.
+- `shared/config/design-tokens.ts` and `shared/styles/global.css` own global design values. Feature
+  and widget CSS consumes semantic custom properties rather than introducing local palettes.
 - Use CSS Modules for local static styles. Do not create `*.styles.ts` style-object files for
-  static CSS — reserve Mantine's style props for genuinely dynamic values only.
-- **Mandatory shared "policy components"** — use these instead of raw elements/direct Mantine
-  primitives; ESLint enforces this:
-  - `ExternalLink` — ESLint forbids raw `<a>` tags
-  - `Image` — ESLint forbids raw `<img>` tags
-  - `Typography` — ESLint forbids direct Mantine `Text`/`Title` outside `shared`
-  - `PageContainer` — ESLint forbids direct Mantine `Container` outside `shared`
-  - ESLint also forbids direct Mantine `Anchor` outside `shared`.
-  - TanStack Router's `Link` remains the primitive for internal navigation (not wrapped).
-- Other Mantine components may be used directly, as-is — do not create a wrapper merely to rename
-  a component.
-- Keep specialized *semantic* markup native (not Mantine-ified) when Mantine would obscure meaning
-  it carries: diagrams, tables, figures, `code`/`pre`, `details`, and lists.
+  static CSS; inline style is reserved for measured/dynamic values.
+- Shared policy components (`ExternalLink`, `Image`, `Typography`, `PageContainer`) preserve
+  accessibility and boundary rules. TanStack Router `Link` remains the internal-navigation
+  primitive.
+- `shared/ui` contains the small reusable control/layout vocabulary. It may adapt Base UI but may
+  not recreate a general component framework or expose appearance-led props to domain components.
+- uPlot is isolated behind the `widgets/live-chart` lifecycle owner. Canvas output always has a
+  semantic textual or tabular alternative, and aggregation remains a backend responsibility.
+- Keep tables, figures, code, details and lists native when their semantics are the point.
 
 ## 9. Testing
 
 - New/changed pure logic, storage behavior, and API-client behavior gets a focused Vitest test
-  under `web/tests/`, named `*.test.ts` or `*.test.tsx`. Render Mantine-based units through
-  `web/tests/render.tsx` so they get the production theme plus a test-safe provider environment.
+  under `web/tests/`, named `*.test.ts` or `*.test.tsx`. Use `web/tests/render.tsx` for the shared
+  test-safe provider environment.
 - New/changed browser journeys get a Playwright spec under `web/e2e/`.
 - E2E specs must use Page Object Model classes from `web/e2e/pages/*.page.ts`, consumed only
   through typed fixtures (`web/e2e/fixtures.ts`) — specs never import Playwright primitives

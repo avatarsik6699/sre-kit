@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "mode": "pull",
   "emits": ["metric"],
+  "presentation_schema": {"groups":[{"id":"infrastructure","title":"Infrastructure","order":10}],"measurements":[{"name":"*","title":"System and containers","group":"infrastructure","visualization":"timeseries"}]},
   "config_schema": {
     "type": "object",
     "properties": {

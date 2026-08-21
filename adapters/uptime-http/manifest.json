@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "mode": "pull",
   "emits": ["check"],
+  "presentation_schema": {"groups":[{"id":"availability","title":"Availability","order":10}],"measurements":[{"name":"*","title":"Checks","group":"availability","visualization":"status"}]},
   "config_schema": {
     "type": "object",
     "properties": {

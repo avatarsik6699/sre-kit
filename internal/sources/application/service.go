@@ -171,6 +171,14 @@ func (s *Service) notifyChange(ctx context.Context, source domain.Source, delete
 // Create validates adapterName/configJSON, assigns a new UUID, and persists a new Source with
 // Enabled=true and LastStatus="unreachable" until the adapter engine reports otherwise.
 func (s *Service) Create(ctx context.Context, adapterName string, configJSON string) (domain.Source, error) {
+	return s.CreateInProject(ctx, "default", adapterName, configJSON)
+}
+
+// CreateInProject creates a Source inside an explicit project boundary.
+func (s *Service) CreateInProject(ctx context.Context, projectID, adapterName string, configJSON string) (domain.Source, error) {
+	if projectID == "" {
+		return domain.Source{}, apierror.Invalid("project_id is required")
+	}
 	if adapterName == "" {
 		return domain.Source{}, apierror.Invalid("adapter_id is required")
 	}
@@ -187,6 +195,7 @@ func (s *Service) Create(ctx context.Context, adapterName string, configJSON str
 
 	source := domain.Source{
 		ID:          uuid.NewString(),
+		ProjectID:   projectID,
 		AdapterName: adapterName,
 		ConfigJSON:  resolvedConfig,
 		Enabled:     true,
@@ -280,4 +289,9 @@ func (s *Service) List(ctx context.Context) ([]domain.Source, error) {
 		return nil, fmt.Errorf("sources: list: %w", err)
 	}
 	return sources, nil
+}
+
+// Get returns one Source for authenticated integration use-cases such as push-token rotation.
+func (s *Service) Get(ctx context.Context, id string) (domain.Source, error) {
+	return s.repo.Get(ctx, id)
 }

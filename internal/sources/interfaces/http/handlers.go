@@ -32,6 +32,7 @@ func (h *Handlers) Register(mux *http.ServeMux) {
 
 type sourceResponse struct {
 	ID         string  `json:"id"`
+	ProjectID  string  `json:"project_id"`
 	AdapterID  string  `json:"adapter_id"`
 	Config     string  `json:"config"`
 	Enabled    bool    `json:"enabled"`
@@ -42,6 +43,7 @@ type sourceResponse struct {
 func toResponse(source domain.Source) sourceResponse {
 	resp := sourceResponse{
 		ID:         source.ID,
+		ProjectID:  source.ProjectID,
 		AdapterID:  source.AdapterName,
 		Config:     source.ConfigJSON,
 		Enabled:    source.Enabled,
@@ -77,6 +79,7 @@ func (h *Handlers) list(w http.ResponseWriter, r *http.Request) {
 }
 
 type createSourceRequest struct {
+	ProjectID string          `json:"project_id"`
 	AdapterID string          `json:"adapter_id"`
 	Config    json.RawMessage `json:"config"`
 }
@@ -103,7 +106,10 @@ func (h *Handlers) create(w http.ResponseWriter, r *http.Request) {
 	if len(req.Config) > 0 {
 		configJSON = string(req.Config)
 	}
-	source, err := h.service.Create(r.Context(), req.AdapterID, configJSON)
+	if req.ProjectID == "" {
+		req.ProjectID = "default"
+	}
+	source, err := h.service.CreateInProject(r.Context(), req.ProjectID, req.AdapterID, configJSON)
 	if err != nil {
 		apierror.Write(w, err)
 		return

@@ -37,15 +37,15 @@
 - **Prevention**: treat `shellComponent` as the only document boundary; do not move document markup
   back into the ordinary route component during layout refactors.
 
-### Retired provisioning tables are intentionally inert
+### Pre-Change-22 databases are not upgraded in place
 
-- **Symptoms**: an upgraded SQLite database still contains `hosts`, `provisioning_runs` and
-  `sources.host_id` although the API and UI no longer expose deployment.
-- **Root cause**: Change 15 removes the write-capable product boundary without running destructive
-  SQLite cleanup against user data created by the experimental prototype.
-- **Fix**: leave migration `0003` and its data unchanged. Inventory it before proposing a separate
-  forward-only cleanup migration; never re-enable Host/provisioner runtime merely because the
-  tables exist.
+- **Symptoms**: an existing SQLite file contains `hosts`, `provisioning_runs` or
+  `sources.host_id`, or startup fails because its migration ledger predates the current baseline.
+- **Root cause**: Change 22 deliberately replaces the disposable development baseline instead of
+  carrying the retired provisioning schema into the general-purpose core.
+- **Fix**: resolve and show the exact runtime SQLite path, obtain explicit operator confirmation,
+  then reset only that database file. Preserve `secrets.enc.json` and unrelated volumes. Never
+  re-enable Host/provisioner runtime merely because an old database still contains its tables.
 
 ### Docker-owned files break host operations (`EACCES` / `EPERM` / read-only)
 

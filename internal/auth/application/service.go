@@ -63,6 +63,26 @@ func (s *Service) EnsureAdminPassword(ctx context.Context) (string, error) {
 	return password, nil
 }
 
+// RotateAdminPassword generates and stores a replacement owner password, invalidating all current
+// in-memory sessions. It is exposed only by the local admin CLI, never by HTTP.
+func (s *Service) RotateAdminPassword(ctx context.Context) (string, error) {
+	password, err := domain.GeneratePassword()
+	if err != nil {
+		return "", fmt.Errorf("auth: generate admin password: %w", err)
+	}
+	hash, err := domain.HashPassword(password)
+	if err != nil {
+		return "", fmt.Errorf("auth: hash admin password: %w", err)
+	}
+	if err := s.secrets.PutNamed(adminPasswordHashKey, hash); err != nil {
+		return "", fmt.Errorf("auth: store admin password hash: %w", err)
+	}
+	s.mu.Lock()
+	s.sessions = map[string]domain.Session{}
+	s.mu.Unlock()
+	return password, nil
+}
+
 // Login verifies password against the stored admin password hash and, on success, issues a new
 // session token valid for sessionTTL.
 func (s *Service) Login(ctx context.Context, password string) (domain.Session, error) {

@@ -1,4 +1,4 @@
-import { Button, Loader, Stack } from "@mantine/core";
+import { Button, Loader, Stack } from "~/shared/ui";
 import { Typography } from "~/shared/components/typography";
 
 // Three tiny, tightly-coupled route-state indicators wired as one trio onto TanStack Router's

@@ -10,7 +10,7 @@ Running 1–10 VPS usually means stitching together 4–6 separate dashboards to
 okay right now": a metrics tool, an uptime checker, container logs, `fail2ban` checked by hand over
 SSH, a certificate-expiry script. Each has its own data model, its own UI, its own alerting setup.
 
-sre-kit normalizes all of that into four entities — **Metric**, **Check**, **Event**, and the
+sre-kit groups Sources into **Projects** and normalizes their output into four entities — **Metric**, **Check**, **Event**, and the
 **Alert**s derived from them — collected by pull adapters over SSH, HTTP or TCP and shown on one
 live-updating dashboard, with a single alert-rule engine notifying you over Telegram. The current
 SSH adapters need no agent on the monitored host; HTTP adapters consume target-owned endpoints.
@@ -25,8 +25,11 @@ SSH adapters need no agent on the monitored host; HTTP adapters consume target-o
 - **`uptime-http`** — HTTP/TCP reachability checks with TLS certificate-expiry tracking.
 - **`fail2ban-ssh`** — ban/unban activity from a remote host's `fail2ban` log, normalized to
   `Event`s.
-- **Live dashboard** — Sources, Dashboard, and Source-detail views pushed over WebSocket; new data
-  is visible within seconds of an adapter emitting it.
+- **Complete dashboards** — project overview and Source detail render every declared metric,
+  label dimension, check, event and alert using a dark Base UI/uPlot client.
+- **Pull or push** — first-party adapters and Source-token/idempotency-key push producers enter the
+  same validation, storage, alert and live-update pipeline.
+- **Bounded storage** — raw telemetry is kept for 30 days and hourly metric rollups for 13 months.
 - **Alert router** — rule-based evaluation over Metric/Check/Event with a full firing → resolved
   lifecycle, delivered to Telegram.
 - **Small self-hosted core** — Go API, SQLite storage, independently built web UI and first-party
@@ -41,13 +44,15 @@ internal/adapterengine/ spawns/schedules adapters, validates NDJSON against the 
 internal/telemetry/     Metric / Check / Event ingestion and query
 internal/alertrouter/   rule evaluation, firing/resolved lifecycle, notification channels
 internal/sources/       configured adapter instances (what to run, with what config)
+internal/projects/      operator-owned grouping and dashboard boundary
 internal/platform/      shared kernel: config, db, secrets, http server, websocket hub
-web/                    React + TanStack Start + Mantine UI frontend
+web/                    React + TanStack Start + Base UI/uPlot frontend
 ```
 
-Each adapter is an independent process: given resolved config on stdin, it emits NDJSON lines
+Each pull/stream adapter is an independent process: given resolved config on stdin, it emits NDJSON lines
 (`metric` / `check` / `event`) on stdout and exits non-zero on failure to reach its target — that's
-the entire contract. Writing a new source means writing a new adapter, not touching the core.
+the entire subprocess contract. Passive push Sources instead authenticate directly to the records
+endpoint and do not launch a binary.
 
 ### Relationship with infraegev2
 
@@ -58,8 +63,9 @@ backup/restore and rollback of observability tools on its VPS. The repositories 
 through versioned Source registration and telemetry ingestion contracts.
 
 The live infraegev2 target uses an independent `infraege-ops` Compose project. Its secret-free
-template defines six intended Sources: uptime, root/password SSH host metrics and fail2ban,
-WireGuard journal gateway, Beszel and Umami. Config shapes match the current manifests. Change 20
+template defines one Project, six pull Sources and one coarse traffic-aggregate push producer:
+uptime, root/password SSH host metrics and fail2ban, WireGuard journal gateway, Beszel and Umami.
+Config shapes match the current manifests. Change 20
 reconciled exactly those six enabled Sources and proved repeated fresh polling, quiet success,
 reversible uptime failure/recovery, and authenticated Dashboard, Sources and detail rendering.
 This bounded proof starts the longer dogfood evidence window; it does not complete the planned
@@ -127,6 +133,21 @@ configuration before saving; its current “Test connection” action does not p
 because no dedicated endpoint exists. SSH adapters need target credentials but no exporter or
 agent installation. See `docs/SPEC.md` §3/§6 for the config and secrets model.
 
+For an external producer, rotate a Source token through the authenticated API and send a
+schema-versioned batch to `POST /api/sources/{id}/records` with `Authorization: Bearer …` and a
+unique `Idempotency-Key`. Tokens belong in the producer's protected environment, never git.
+
+### Recover the admin password
+
+With the same `SRE_KIT_SECRETS_PATH` and `SRE_KIT_SECRETS_KEY` as the server, stop the core and run:
+
+```bash
+go run ./cmd/admin rotate-password
+```
+
+The command prints the replacement once. Save it immediately; the encrypted store contains only
+its hash. Existing in-memory sessions disappear when the server restarts.
+
 ## Writing a new adapter
 
 An adapter is any executable that:
@@ -148,8 +169,9 @@ The core v1 feature set is implemented: unified contract, six production pull ad
 dashboard and Telegram alerting. The six infraegev2 Sources have passed bounded end-to-end
 reconciliation. M6 remains in progress, but its longer dogfood evidence window is paused while the
 workstation core is off; no polling or alerts accumulate during that pause.
-Generic push ingress, adapter extensibility hardening and a combined deployable distribution remain
-later milestones. See [`docs/SPEC.md`](docs/SPEC.md) §9 for the roadmap and
+Change 22 implements Projects, generic push, presentation manifests, bounded retention and the
+complete dashboard redesign. A combined deployable distribution remains a later milestone. See
+[`docs/SPEC.md`](docs/SPEC.md) §9 for the roadmap and
 [`docs/changes/archive/`](docs/changes/archive/) for the history of how each piece was built.
 
 ## Development workflow

@@ -40,6 +40,7 @@ COPY --from=build /out/adapters/beszel-api/beszel-api ./adapters/beszel-api/besz
 COPY adapters/beszel-api/manifest.json ./adapters/beszel-api/manifest.json
 COPY --from=build /out/adapters/umami-http/umami-http ./adapters/umami-http/umami-http
 COPY adapters/umami-http/manifest.json ./adapters/umami-http/manifest.json
+COPY adapters/push/manifest.json ./adapters/push/manifest.json
 
 RUN mkdir -p /app/data && chown -R sre-kit:sre-kit /app
 USER sre-kit

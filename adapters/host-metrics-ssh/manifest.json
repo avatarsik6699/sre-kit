@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "mode": "pull",
   "emits": ["metric"],
+  "presentation_schema": {"groups":[{"id":"host","title":"Host health","order":10}],"measurements":[{"name":"*","title":"Host metrics","group":"host","visualization":"timeseries"}]},
   "config_schema": {
     "type": "object",
     "properties": {

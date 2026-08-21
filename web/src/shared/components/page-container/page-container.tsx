@@ -1,11 +1,13 @@
-import { Container } from "@mantine/core";
 import type { PageContainerTypes } from "./page-container.types";
 
-/** The only place Mantine's Container may be used directly — ESLint forbids it elsewhere. */
+/** The only place repository-owned's Container may be used directly — ESLint forbids it elsewhere. */
 export const PageContainer: React.FC<PageContainerTypes.Props> = (props) => {
   return (
-    <Container size={props.size ?? "xl"} className={props.className}>
+    <main
+      className={props.className}
+      style={{ width: "min(1440px, 100%)", margin: "0 auto" }}
+    >
       {props.children}
-    </Container>
+    </main>
   );
 };

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "mode": "pull",
   "emits": ["event"],
+  "presentation_schema": {"groups":[{"id":"logs","title":"Application events","order":10}],"measurements":[{"name":"*","title":"Journal","group":"logs","visualization":"feed"}]},
   "config_schema": {
     "type": "object",
     "properties": {

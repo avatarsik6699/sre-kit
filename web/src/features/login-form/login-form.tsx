@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Button, PasswordInput, Stack } from "@mantine/core";
+import { Button, PasswordInput, Stack } from "~/shared/ui";
 import { apiClient, normalizeApiFailure } from "~/shared/api";
 import { Typography } from "~/shared/components/typography";
 import type { LoginFormTypes } from "./login-form.types";

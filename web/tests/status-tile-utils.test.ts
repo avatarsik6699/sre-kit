@@ -44,9 +44,9 @@ describe("statusTileUtils.summarizeChecks", () => {
 
 describe("statusTileUtils.toPulseStatusWithAlert", () => {
   it("overrides with critical when a critical alert is active", () => {
-    expect(
-      statusTileUtils.toPulseStatusWithAlert("ok", ["critical"]),
-    ).toBe("critical");
+    expect(statusTileUtils.toPulseStatusWithAlert("ok", ["critical"])).toBe(
+      "critical",
+    );
   });
 
   it("overrides with warn when only a warning alert is active", () => {

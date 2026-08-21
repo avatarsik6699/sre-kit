@@ -1,16 +1,15 @@
-import { Image as MantineImage } from "@mantine/core";
 import type { ImageTypes } from "./image.types";
 
-/** The only place a raw `<img>` (or Mantine's Image) may render — ESLint forbids both elsewhere. */
+/** The only place a raw `<img>` (or repository-owned's Image) may render — ESLint forbids both elsewhere. */
 export const Image: React.FC<ImageTypes.Props> = (props) => {
   return (
-    <MantineImage
+    <img
       src={props.src}
       alt={props.alt}
-      w={props.width}
-      h={props.height}
-      radius={props.radius}
+      width={props.width}
+      height={props.height}
       className={props.className}
+      style={{ borderRadius: props.radius }}
     />
   );
 };

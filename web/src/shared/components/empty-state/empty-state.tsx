@@ -1,4 +1,4 @@
-import { Stack } from "@mantine/core";
+import { Stack } from "~/shared/ui";
 import { Typography } from "~/shared/components/typography";
 
 export type EmptyStateProps = {

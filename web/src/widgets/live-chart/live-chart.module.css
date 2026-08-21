@@ -1,0 +1,30 @@
+.plot {
+  width: 100%;
+  min-height: 300px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.tableWrap {
+  overflow: auto;
+}
+.tableWrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.tableWrap caption {
+  text-align: left;
+  color: var(--muted);
+  padding: 8px 0;
+}
+.tableWrap th,
+.tableWrap td {
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  padding: 8px;
+}
+.tableWrap th {
+  color: var(--muted);
+  font-size: 12px;
+}

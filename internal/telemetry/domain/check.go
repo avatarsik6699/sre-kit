@@ -18,6 +18,7 @@ type Check struct {
 // CheckQuery filters CheckRepository.Query. Zero-value fields are unfiltered ("any").
 type CheckQuery struct {
 	SourceID string
+	Limit    int
 }
 
 // CheckRepository is the persistence port for Check, implemented by

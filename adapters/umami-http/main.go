@@ -31,6 +31,7 @@ type config struct {
 	Password        string   `json:"password"`
 	LookbackSeconds int      `json:"lookback_seconds"`
 	TrackedEvents   []string `json:"tracked_events"`
+	Dimensions      []string `json:"dimensions"`
 }
 
 // ndjsonLine is deliberately independent of internal/contract's types — an adapter is any
@@ -87,6 +88,18 @@ func main() {
 	}
 
 	lines := toNDJSON(stats, now)
+	if cfg.Dimensions == nil {
+		cfg.Dimensions = []string{"url", "referrer", "country", "browser", "os", "device"}
+	}
+	for _, dimension := range cfg.Dimensions {
+		values, err := fetchDimension(client, cfg, token, dimension, since, now)
+		if err != nil {
+			log.Fatalf("umami-http: fetch %s dimension: %v", dimension, err)
+		}
+		for _, value := range values {
+			lines = append(lines, dimensionNDJSON(dimension, value.X, value.Y, now))
+		}
+	}
 	for _, eventName := range cfg.TrackedEvents {
 		count, err := fetchEventCount(client, cfg, token, eventName, since, now)
 		if err != nil {
@@ -186,6 +199,42 @@ type eventsResponse struct {
 	Count float64 `json:"count"`
 }
 
+type dimensionValue struct {
+	X string  `json:"x"`
+	Y float64 `json:"y"`
+}
+
+func fetchDimension(client *http.Client, cfg config, token, dimension string, since, until time.Time) ([]dimensionValue, error) {
+	base := strings.TrimRight(cfg.BaseURL, "/")
+	q := url.Values{}
+	q.Set("startAt", fmt.Sprintf("%d", since.UnixMilli()))
+	q.Set("endAt", fmt.Sprintf("%d", until.UnixMilli()))
+	q.Set("type", dimension)
+	reqURL := fmt.Sprintf("%s/api/websites/%s/metrics?%s", base, url.PathEscape(cfg.WebsiteID), q.Encode())
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(raw))
+	}
+	var values []dimensionValue
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return values, nil
+}
+
 // fetchEventCount issues one GET /api/websites/{id}/events request filtered to eventName, returning
 // the total count of matching events in [since, until]. Generic by design: sre-kit has no notion of
 // which event names matter — the caller (a source's tracked_events config) decides that per
@@ -235,8 +284,12 @@ func eventCountNDJSON(eventName string, count float64, ts time.Time) ndjsonLine 
 		Name:      "analytics.event_count",
 		Timestamp: ts.Format(time.RFC3339),
 		Value:     count,
-		Labels:    map[string]string{"event": eventName},
+		Labels:    map[string]string{"event": eventName, "traffic_class": "browser_analytics"},
 	}
+}
+
+func dimensionNDJSON(dimension, value string, count float64, ts time.Time) ndjsonLine {
+	return ndjsonLine{Type: "metric", SourceID: "umami-http", Name: "analytics." + dimension + "_count", Timestamp: ts.Format(time.RFC3339), Value: count, Labels: map[string]string{"value": value, "traffic_class": "browser_analytics"}}
 }
 
 // toNDJSON converts stats into wire metric lines, all stamped at ts (the poll time) — a snapshot
@@ -244,11 +297,12 @@ func eventCountNDJSON(eventName string, count float64, ts time.Time) ndjsonLine 
 // this adapter doesn't call Umami's /pageviews time-series endpoint).
 func toNDJSON(stats statsResponse, ts time.Time) []ndjsonLine {
 	timestamp := ts.Format(time.RFC3339)
+	labels := map[string]string{"traffic_class": "browser_analytics"}
 	return []ndjsonLine{
-		{Type: "metric", SourceID: "umami-http", Name: "analytics.pageviews", Timestamp: timestamp, Value: stats.Pageviews},
-		{Type: "metric", SourceID: "umami-http", Name: "analytics.visitors", Timestamp: timestamp, Value: stats.Visitors},
-		{Type: "metric", SourceID: "umami-http", Name: "analytics.visits", Timestamp: timestamp, Value: stats.Visits},
-		{Type: "metric", SourceID: "umami-http", Name: "analytics.bounces", Timestamp: timestamp, Value: stats.Bounces},
-		{Type: "metric", SourceID: "umami-http", Name: "analytics.totaltime_seconds", Timestamp: timestamp, Value: stats.Totaltime},
+		{Type: "metric", SourceID: "umami-http", Name: "analytics.pageviews", Timestamp: timestamp, Value: stats.Pageviews, Labels: labels},
+		{Type: "metric", SourceID: "umami-http", Name: "analytics.visitors", Timestamp: timestamp, Value: stats.Visitors, Labels: labels},
+		{Type: "metric", SourceID: "umami-http", Name: "analytics.visits", Timestamp: timestamp, Value: stats.Visits, Labels: labels},
+		{Type: "metric", SourceID: "umami-http", Name: "analytics.bounces", Timestamp: timestamp, Value: stats.Bounces, Labels: labels},
+		{Type: "metric", SourceID: "umami-http", Name: "analytics.totaltime_seconds", Timestamp: timestamp, Value: stats.Totaltime, Labels: labels},
 	}
 }

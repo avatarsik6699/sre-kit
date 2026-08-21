@@ -1,4 +1,4 @@
-import { Card, Stack } from "@mantine/core";
+import { Card, Stack } from "~/shared/ui";
 import {
   StatusPulse,
   type StatusPulseStatus,

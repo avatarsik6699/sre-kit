@@ -66,6 +66,18 @@ export default tseslint.config(
     // except the one owning adapter file for each — narrowed back open just below.
     files: ["src/**/*.{ts,tsx}"],
     rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@mantine/*", "recharts"],
+              message:
+                "Mantine and Recharts were removed; use shared/ui, semantic HTML/CSS, or the owned uPlot wrapper.",
+            },
+          ],
+        },
+      ],
       "no-restricted-globals": [
         "error",
         {

@@ -6,7 +6,7 @@ import {
   PasswordInput,
   Stack,
   TextInput,
-} from "@mantine/core";
+} from "~/shared/ui";
 import { Typography } from "~/shared/components/typography";
 import type { NotificationChannelFormTypes } from "./notification-channel-form.types";
 

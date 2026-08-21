@@ -1,4 +1,4 @@
-import { Center } from "@mantine/core";
+import { Center } from "~/shared/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { LoginForm } from "~/features/login-form";
 

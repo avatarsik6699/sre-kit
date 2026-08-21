@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActionIcon, Button, Group, Switch, Table } from "@mantine/core";
+import { ActionIcon, Button, Group, Switch, Table } from "~/shared/ui";
 import { Link } from "@tanstack/react-router";
 import { PageContainer } from "~/shared/components/page-container";
 import { Typography } from "~/shared/components/typography";
@@ -12,6 +12,7 @@ import {
   useDeleteSourceMutation,
   useSourcesQuery,
   useUpdateSourceMutation,
+  type Source,
 } from "~/entities/source";
 import { AddSourceDrawer } from "~/widgets/add-source-drawer";
 
@@ -58,7 +59,7 @@ export const SourcesPage: React.FC = () => {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {(sourcesQuery.data ?? []).map((source) => (
+            {(sourcesQuery.data ?? []).map((source: Source) => (
               <Table.Tr key={source.id}>
                 <Table.Td>
                   <StatusPulse status={toPulseStatus(source.lastStatus)} />

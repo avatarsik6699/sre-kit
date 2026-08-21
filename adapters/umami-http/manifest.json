@@ -3,6 +3,33 @@
   "version": "0.1.0",
   "mode": "pull",
   "emits": ["metric"],
+  "presentation_schema": {
+    "groups": [
+      {"id":"overview","title":"Overview","order":10},
+      {"id":"traffic","title":"Traffic composition","order":20},
+      {"id":"acquisition","title":"Acquisition","order":30},
+      {"id":"audience","title":"Audience and technology","order":40},
+      {"id":"content","title":"Pages","order":50},
+      {"id":"product","title":"Product events","order":60}
+    ],
+    "measurements": [
+      {"name":"analytics.pageviews","title":"Pageviews","group":"overview","unit":"count","visualization":"stat"},
+      {"name":"analytics.visitors","title":"Anonymous visitors","group":"overview","unit":"count","visualization":"stat"},
+      {"name":"analytics.visits","title":"Visits","group":"overview","unit":"count","visualization":"timeseries"},
+      {"name":"analytics.bounces","title":"Bounces","group":"overview","unit":"count","visualization":"stat"},
+      {"name":"analytics.totaltime_seconds","title":"Visit time","group":"overview","unit":"seconds","visualization":"stat"},
+      {"name":"analytics.referrer_count","title":"Referrers","group":"acquisition","unit":"count","visualization":"table","dimensions":["value","traffic_class"]},
+      {"name":"analytics.country_count","title":"Countries","group":"audience","unit":"count","visualization":"table","dimensions":["value","traffic_class"]},
+      {"name":"analytics.region_count","title":"Regions","group":"audience","unit":"count","visualization":"table","dimensions":["value","traffic_class"]},
+      {"name":"analytics.city_count","title":"Cities","group":"audience","unit":"count","visualization":"table","dimensions":["value","traffic_class"]},
+      {"name":"analytics.browser_count","title":"Browsers","group":"audience","unit":"count","visualization":"table","dimensions":["value","traffic_class"]},
+      {"name":"analytics.os_count","title":"Operating systems","group":"audience","unit":"count","visualization":"table","dimensions":["value","traffic_class"]},
+      {"name":"analytics.device_count","title":"Devices","group":"audience","unit":"count","visualization":"table","dimensions":["value","traffic_class"]},
+      {"name":"analytics.language_count","title":"Languages","group":"audience","unit":"count","visualization":"table","dimensions":["value","traffic_class"]},
+      {"name":"analytics.url_count","title":"Pages","group":"content","unit":"count","visualization":"table","dimensions":["value","traffic_class"]},
+      {"name":"analytics.event_count","title":"Product events","group":"product","unit":"count","visualization":"table","dimensions":["event","traffic_class"]}
+    ]
+  },
   "config_schema": {
     "type": "object",
     "properties": {
@@ -37,6 +64,12 @@
         "items": { "type": "string" },
         "default": [],
         "description": "Optional list of Umami custom event names to track. For each name, one analytics.event_count metric is emitted per poll (labels: {event: <name>}), counting matching events within lookback_seconds. Fully generic — sre-kit has no built-in notion of which events matter; supply whatever event names your own site emits (e.g. a signup funnel's steps)."
+      },
+      "dimensions": {
+        "type": "array",
+        "items": {"type":"string","enum":["url","referrer","country","region","city","browser","os","device","language"]},
+        "default": ["url","referrer","country","browser","os","device"],
+        "description": "Privacy-safe aggregate Umami breakdowns to collect. Values are aggregate labels, never individual profiles."
       }
     },
     "required": ["base_url", "website_id", "username", "password"],
