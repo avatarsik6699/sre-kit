@@ -7,7 +7,7 @@
 | Change | `23` |
 | Slug | `umami-v3-dimension-compatibility` |
 | Title | Umami v3 Dimension Compatibility |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/23-umami-v3-dimension-compatibility` |
 
 ---
