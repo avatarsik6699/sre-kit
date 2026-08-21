@@ -9,7 +9,7 @@
 | Change | `22` |
 | Slug | `analytics-core-dashboard-redesign` |
 | Title | Analytics Core and Dashboard Redesign |
-| Status | `active` |
+| Status | `archived` |
 | Branch | `feature/22-analytics-core-dashboard-redesign` |
 
 ---
