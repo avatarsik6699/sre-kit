@@ -268,3 +268,32 @@ func TestFetchDimensionPreservesAggregateLabels(t *testing.T) {
 		t.Fatalf("labels = %+v", line.Labels)
 	}
 }
+
+func TestFetchDimensionMapsURLToUmamiPath(t *testing.T) {
+	var gotType string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotType = r.URL.Query().Get("type")
+		fmt.Fprint(w, `[{"x":"/ege/16-rekursiya","y":3}]`)
+	}))
+	defer server.Close()
+
+	values, err := fetchDimension(
+		&http.Client{},
+		config{BaseURL: server.URL, WebsiteID: "site1"},
+		"tok",
+		"url",
+		time.UnixMilli(1000),
+		time.UnixMilli(2000),
+	)
+	if err != nil {
+		t.Fatalf("fetchDimension: %v", err)
+	}
+	if gotType != "path" {
+		t.Fatalf("type = %q, want path", gotType)
+	}
+
+	line := dimensionNDJSON("url", values[0].X, values[0].Y, time.Unix(0, 0).UTC())
+	if line.Name != "analytics.url_count" || line.Labels["value"] != "/ege/16-rekursiya" {
+		t.Fatalf("line = %+v", line)
+	}
+}

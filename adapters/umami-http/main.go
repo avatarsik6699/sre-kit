@@ -209,7 +209,11 @@ func fetchDimension(client *http.Client, cfg config, token, dimension string, si
 	q := url.Values{}
 	q.Set("startAt", fmt.Sprintf("%d", since.UnixMilli()))
 	q.Set("endAt", fmt.Sprintf("%d", until.UnixMilli()))
-	q.Set("type", dimension)
+	apiDimension := dimension
+	if dimension == "url" {
+		apiDimension = "path"
+	}
+	q.Set("type", apiDimension)
 	reqURL := fmt.Sprintf("%s/api/websites/%s/metrics?%s", base, url.PathEscape(cfg.WebsiteID), q.Encode())
 	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
