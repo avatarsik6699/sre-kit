@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://sre-kit.local/contract.schema.json",
   "title": "sre-kit data contract",
-  "description": "Versioned wire contract for the four entities an adapter may emit as NDJSON lines (metric, check, event) plus the core-generated alert entity, per docs/SPEC.md §4. schema_version is \"1.0\". Versioning rule: this schema is additive-only within a major version — new optional fields or new \"type\" variants may be added without a version bump beyond documenting them here; removing or repurposing an existing field, or changing an existing field's meaning/type, requires a major version bump (e.g. \"2.0\") and is a breaking change. The reserved future \"action\" primitive (docs/SPEC.md §2.2, §10) will be added as a new variant under this same additive rule, not implemented in v1.",
+  "description": "Versioned wire contract for the three telemetry records an adapter may emit as NDJSON lines (metric, check, event) plus the core-generated alert entity used on core-owned wire surfaces, per docs/SPEC.md §4. schema_version is \"1.0\". Versioning rule: this schema is additive-only within a major version — new optional fields or new \"type\" variants may be added without a version bump beyond documenting them here; removing or repurposing an existing field, or changing an existing field's meaning/type, requires a major version bump (e.g. \"2.0\") and is a breaking change. Remote actions and deployment primitives are outside this observability contract.",
   "oneOf": [
     { "$ref": "#/$defs/metric" },
     { "$ref": "#/$defs/check" },

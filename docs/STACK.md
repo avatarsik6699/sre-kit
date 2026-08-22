@@ -17,7 +17,7 @@
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React **19.2.8**, TanStack Start **1.168.44**, Base UI **1.7.0**, uPlot **1.6.32**, Vite **8.2.1** and TanStack Query **5.101.4** over the WS stream |
-| Backend | Go **1.26.5** (`x/crypto/ssh` for SSH-based collectors) |
+| Backend | Go **1.26.5 minimum within 1.26** (`x/crypto/ssh` for SSH-based collectors); Docker pins `golang:1.26.5-alpine` |
 | Database | SQLite (`modernc.org/sqlite` or `mattn`) |
 | Cache | — (no separate cache layer; batched direct writes to SQLite) |
 | Infra | Current Docker image contains the Go API and adapters; web is built separately. Combined local/management-VPS distribution is deferred to M11. `infraegev2` is the first dogfood integration and owns its own target automation |
@@ -50,9 +50,9 @@ set +a
 ```
 
 Run the API with the required environment loaded (`go run ./cmd/server`) and the web development
-server separately (`pnpm --dir web dev`). The current Docker image packages the API, six pull
-adapter binaries and the passive push manifest, but not the web build; the combined distribution
-remains M11.
+server separately (`pnpm --dir web dev`). The current Docker build pins Go 1.26.5 and packages the
+API, six pull adapter binaries and the passive push manifest, but not the web build; the combined
+distribution remains M11.
 
 ---
 

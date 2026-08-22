@@ -80,8 +80,8 @@ module layout, and conventions.
 
 ### Prerequisites
 
-- Go 1.26+
-- Node.js + `pnpm` (frontend)
+- Go 1.26.5 or newer within the supported 1.26 toolchain
+- Node.js 24.x and pnpm 10.33.0 exactly (frontend)
 - A Linux host reachable over SSH, for `host-metrics-ssh` / `fail2ban-ssh`
 
 ### Run locally
@@ -167,10 +167,11 @@ reference implementations, and each adapter's `manifest.json` for the config-sch
 
 The core v1 feature set is implemented: unified contract, six production pull adapters, live
 dashboard and Telegram alerting. The six infraegev2 Sources have passed bounded end-to-end
-reconciliation. M6 remains in progress, but its longer dogfood evidence window is paused while the
-workstation core is off; no polling or alerts accumulate during that pause.
-Change 22 implements Projects, generic push, presentation manifests, bounded retention and the
-complete dashboard redesign. A combined deployable distribution remains a later milestone. See
+reconciliation. M6 remains in progress through explicit operator-started sessions: polling,
+publisher delivery and alerts run only while `sre-kit-local` is active, so no evidence accumulates
+while the workstation or session is off. Change 22 completed the M9 Projects, generic push,
+presentation, bounded-retention and dashboard slice; Change 23 restored Umami v3 dimension
+compatibility. A combined deployable distribution remains a later milestone. See
 [`docs/SPEC.md`](docs/SPEC.md) §9 for the roadmap and
 [`docs/changes/archive/`](docs/changes/archive/) for the history of how each piece was built.
 

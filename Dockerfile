@@ -5,7 +5,7 @@
 # only the compiled server + the adapters directory (subprocess binaries + manifest.json) need to
 # ship in the final image.
 
-FROM golang:1.26-alpine AS build
+FROM golang:1.26.5-alpine AS build
 WORKDIR /src
 
 COPY go.mod go.sum ./

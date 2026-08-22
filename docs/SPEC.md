@@ -9,8 +9,8 @@
 
 | Field | Value |
 |-------|-------|
-| Document Version | `v1.2` |
-| Date | `2026-08-21` |
+| Document Version | `v1.3` |
+| Date | `2026-08-22` |
 | Architect / Owner | `avatarsik666@gmail.com` |
 | Stack | See [docs/STACK.md](./STACK.md) |
 | Domain | Self-hosted SRE/observability aggregator for solo developers and small teams |
@@ -217,6 +217,11 @@ CREATE TABLE maintenance_runs (...); -- status and deletion counts for each rete
 The Change 22 baseline contains no retired Host or provisioning schema. Database files created by
 an earlier development baseline are unsupported and must be reset through an explicit operator
 action; startup never deletes or rewrites them implicitly.
+
+Migration `0001_init.sql` always owns a protected `default` Project for newly created Sources that
+have not yet been assigned. It may remain empty after every Source moves to a named Project; the
+Project API intentionally rejects its deletion, so an empty `default` row is expected baseline
+state rather than stale dogfood data.
 
 Secrets (SSH keys, third-party API tokens) are **not** stored in SQLite. They live in a separate
 `secrets.enc.json`, symmetrically encrypted with a key from an environment variable or a
@@ -463,10 +468,10 @@ claim that an artifact was published or a management host was deployed.
 | `M3` | complete | `uptime-http` adapter (+ TLS expiry) | Concurrent adapters without a contract change |
 | `M4` | complete | Minimal UI | Sources, Dashboard, Source detail, WS updates and manifest-backed source form |
 | `M5` | complete | Alert router + Telegram channel | Firing/resolved alert lifecycle and notification-channel management |
-| `M6` | in progress | Dogfooding on infraegev2 | Six production adapters and Sources are reconciled; Change 20 proves fresh polling, quiet success, reversible failure/recovery and authenticated UI rendering. The longer evidence window is paused while the workstation core is off and resumes only with explicit runtime ownership |
+| `M6` | in progress | Dogfooding on infraegev2 | Six production pull Sources plus the push Source are healthy in explicit operator-started sessions. Change 20 proves pull polling, quiet success, reversible failure/recovery and authenticated UI rendering; Changes 22–23 and the infraegev2 publisher add the analytics contour. The longer evidence window advances only while `sre-kit-local` is active |
 | `M7` | partial | Dogfood extensions | `fail2ban-ssh`, `journal-http`, `beszel-api` and `umami-http` shipped; Docker adapter and second channel are not approved merely because the old row mentioned them |
 | `M8` | retired | Host/provisioner prototype | Write-capable deployment was separated from the trust domain and removed from runtime by Change 15; inert migration data remains |
-| `M9` | in progress | Analytics core and dashboards | Change 22: Projects, authenticated generic push, bounded raw/hourly data and full schema-driven UI |
+| `M9` | complete | Analytics core and dashboards | Change 22 shipped Projects, authenticated generic push, bounded raw/hourly data and the full schema-driven UI; Change 23 restored the deployed Umami v3 dimension path |
 | `M10` | in progress | Adapter extensibility | Change 22 adds presentation capabilities and validates every first-party manifest; sandbox/contributor packaging remains later |
 | `M11` | partial | Core distribution | Change 22 adds retention; reproducible artifact, backup/restore and always-on install remain later |
 
@@ -476,8 +481,8 @@ claim that an artifact was published or a management host was deployed.
 |-------|-------|---------------|
 | `0` | Complete documentation Change 19 with linked infraegev2 Change 44 | Complete: six template configs remain manifest-valid; the stale local state and ownership boundaries were recorded without secrets or runtime mutation |
 | `1` | Reconcile the six infraegev2 Sources in Change 20 and run a bounded soak | Complete: all six Sources have repeated fresh `ok` outcomes; quiet success, reversible failure/recovery and authenticated browser rendering are proven without target-side mutation |
-| `2` | Resume the bounded M6 dogfood evidence window | First add a supported owner-only admin password rotation/recovery command, then resume the core under explicit runtime ownership and observe real behavior long enough to rank recurring gaps; do not expand M9 from a single-session snapshot |
-| `3` | Select the smallest M9 slice from accumulated dogfood evidence | One project boundary and authenticated push journey are specified end to end; no target mutation or deploy credentials enter sre-kit |
+| `2` | Complete the M9 analytics slice and deployed Umami compatibility | Complete: Change 22 shipped Projects, authenticated push, retention, presentation manifests and dashboards; Change 23 restored Umami v3 dimensions without widening the public contract |
+| `3` | Continue bounded M6 dogfood through explicit sessions | The supported owner-only password recovery command already exists. Run the core only under explicit runtime ownership and accumulate enough real evidence to rank recurring gaps without claiming always-on coverage |
 | `4` | Harden M10 before accepting external adapters | Manifest versioning, conformance and sandbox/trust decisions have executable acceptance evidence |
 | `5` | Build M11 distribution | One reproducible artifact includes API, web and adapters; local install plus the architect-selected always-on path prove backup, restore, upgrade and exact-version health |
 
